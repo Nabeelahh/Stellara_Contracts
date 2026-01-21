@@ -10,6 +10,8 @@ pub struct ContractConfig {
     pub is_paused: bool,
 }
 
+pub mod fees;
+
 /// Standard contract error codes
 pub mod errors {
     pub const UNAUTHORIZED: &str = "UNAUTHORIZED";
