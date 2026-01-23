@@ -58,7 +58,15 @@
     "tweetnacl": "^1.0.3",
     "tweetnacl-util": "^0.15.1",
     "typeorm": "^0.3.28",
-    "uuid": "^13.0.0"
+    "uuid": "^13.0.0",
+    "winston": "^3.14.2",
+    "jaeger-client": "^3.19.0",
+    "prom-client": "^15.1.0",
+    "opentelemetry-api": "^1.9.2",
+    "opentelemetry-sdk-node": "^0.50.2",
+    "opentelemetry-sdk-trace-node": "^0.50.2",
+    "opentelemetry-instrumentation-http": "^0.50.2",
+    "opentelemetry-instrumentation-express": "^0.33.5"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3.2.0",
