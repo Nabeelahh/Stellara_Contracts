@@ -1,7 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { getQueueToken } from '@nestjs/bull';
-import { QueueService } from '../services/queue.service';
-import { RedisService } from '../../redis/redis.service';
+import { QueueService } from './services/queue.service';
+import { RedisService } from '../redis/redis.service';
 
 /**
  * Integration tests for queue retry and dead-letter queue (DLQ) handling
@@ -20,7 +20,7 @@ describe('Queue Integration - Retries and DLQ', () => {
   ) => ({
     id,
     name,
-    data: { test: 'data' },
+    data: { test: 'data', contractName: '', contractCode: '', network: '' } as any,
     returnvalue: failedReason ? undefined : { success: true },
     failedReason,
     timestamp: Date.now(),
@@ -117,7 +117,7 @@ describe('Queue Integration - Retries and DLQ', () => {
       const result = await service.requeueJob('deploy-contract', 'job-1');
 
       expect(result).toBeDefined();
-      expect(result.id).toBe('job-2');
+      expect(result!.id).toBe('job-2');
       expect(mockQueues.deployContractQueue.add).toHaveBeenCalledWith(
         'deploy-contract',
         failedJob.data,
@@ -341,7 +341,7 @@ describe('Queue Integration - Retries and DLQ', () => {
       };
 
       const failedJob = createMockJob('job-1', 'deploy-contract', 2, 3, 'Network error');
-      failedJob.data = originalData;
+      failedJob.data = { ...failedJob.data, ...originalData };
 
       mockQueues.deployContractQueue.getJob.mockResolvedValue(failedJob);
       const requeuedJob = createMockJob('job-2', 'deploy-contract', 0, 3);
@@ -396,7 +396,7 @@ describe('Queue Integration - Retries and DLQ', () => {
       const dlqItem = JSON.stringify({
         id: 'job-1',
         name: 'deploy-contract',
-        data: { test: 'data' },
+        data: { test: 'data' } as any,
         error: 'Max retries exceeded',
         attempts: 3,
         maxAttempts: 3,

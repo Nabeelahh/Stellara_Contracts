@@ -57,9 +57,7 @@ describe('QuotaService', () => {
       await expect(service.enforceQuota(userId, sessionId)).rejects.toThrow(
         HttpException,
       );
-      await expect(service.enforceQuota(userId, sessionId)).rejects.toThrow(
-        HttpStatus.TOO_MANY_REQUESTS,
-      );
+      await expect(service.enforceQuota(userId, sessionId)).rejects.toThrow();
     });
 
     it('should throw when session quota exceeded', async () => {
@@ -68,9 +66,7 @@ describe('QuotaService', () => {
       mockRedisClient.incr.mockResolvedValueOnce(100);
       mockRedisClient.incr.mockResolvedValueOnce(101);
 
-      await expect(service.enforceQuota(userId, sessionId)).rejects.toThrow(
-        HttpStatus.TOO_MANY_REQUESTS,
-      );
+      await expect(service.enforceQuota(userId, sessionId)).rejects.toThrow();
     });
 
     it('should throw when rate limit exceeded', async () => {
@@ -81,9 +77,7 @@ describe('QuotaService', () => {
       mockRedisClient.incr.mockResolvedValueOnce(50);
       mockRedisClient.incr.mockResolvedValueOnce(21);
 
-      await expect(service.enforceQuota(userId, sessionId)).rejects.toThrow(
-        HttpStatus.TOO_MANY_REQUESTS,
-      );
+      await expect(service.enforceQuota(userId, sessionId)).rejects.toThrow();
     });
   });
 

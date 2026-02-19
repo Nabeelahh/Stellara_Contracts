@@ -1,6 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { INestApplication, ValidationPipe } from '@nestjs/common';
-import * as request from 'supertest';
+import request from 'supertest';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { ConfigModule } from '@nestjs/config';
 import { AuthModule } from './auth.module';
@@ -331,7 +331,7 @@ describe('Auth Integration Tests (e2e)', () => {
       const publicKey = Keypair.random().publicKey();
 
       // Make 6 rapid requests (limit is 5 per minute)
-      const requests = [];
+      const requests: Array<Promise<any>> = [];
       for (let i = 0; i < 6; i++) {
         requests.push(
           request(app.getHttpServer())

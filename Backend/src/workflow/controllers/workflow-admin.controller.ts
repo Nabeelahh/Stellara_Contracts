@@ -17,6 +17,9 @@ import { WorkflowStep } from '../entities/workflow-step.entity';
 import { WorkflowState } from '../types/workflow-state.enum';
 import { StepState } from '../types/step-state.enum';
 import { WorkflowExecutionService } from '../services/workflow-execution.service';
+import { CompensationService } from '../services/compensation.service';
+import { RecoveryService } from '../services/recovery.service';
+import { MonitoringService } from '../services/monitoring.service';
 
 @ApiTags('workflow-admin')
 @Controller('admin/workflows')
@@ -27,6 +30,9 @@ export class WorkflowAdminController {
     @InjectRepository(WorkflowStep)
     private readonly stepRepository: Repository<WorkflowStep>,
     private readonly workflowExecutionService: WorkflowExecutionService,
+    private readonly compensationService: CompensationService,
+    private readonly recoveryService: RecoveryService,
+    private readonly monitoringService: MonitoringService,
   ) {}
 
   @Get()
@@ -227,7 +233,7 @@ export class WorkflowAdminController {
   @ApiResponse({ status: 400, description: 'Workflow cannot be compensated' })
   async compensateWorkflow(@Param('id') id: string) {
     try {
-      await this.workflowExecutionService.compensateWorkflow(id);
+      await this.compensationService.compensateWorkflow(id);
       return { message: 'Workflow compensation initiated', workflowId: id };
     } catch (error) {
       throw new HttpException(error.message, HttpStatus.BAD_REQUEST);
@@ -358,5 +364,79 @@ export class WorkflowAdminController {
         totalPages: Math.ceil(total / limit),
       },
     };
+  }
+
+  @Post('recovery/trigger')
+  @ApiOperation({ summary: 'Trigger manual recovery process' })
+  @ApiResponse({ status: 200, description: 'Recovery process initiated' })
+  async triggerRecovery() {
+    try {
+      const results = await this.recoveryService.triggerManualRecovery();
+      return {
+        message: 'Recovery process completed',
+        results,
+      };
+    } catch (error) {
+      throw new HttpException(error.message, HttpStatus.INTERNAL_SERVER_ERROR);
+    }
+  }
+
+  @Get('metrics')
+  @ApiOperation({ summary: 'Get workflow metrics and statistics' })
+  @ApiResponse({ status: 200, description: 'Workflow metrics' })
+  async getMetrics(
+    @Query('hours') hours: number = 24,
+  ) {
+    try {
+      const workflowMetrics = await this.monitoringService.getWorkflowMetrics(hours);
+      const stepMetrics = await this.monitoringService.getStepMetrics(hours);
+      const systemHealth = await this.monitoringService.getSystemHealth();
+      
+      return {
+        workflowMetrics,
+        stepMetrics,
+        systemHealth,
+      };
+    } catch (error) {
+      throw new HttpException(error.message, HttpStatus.INTERNAL_SERVER_ERROR);
+    }
+  }
+
+  @Get('health')
+  @ApiOperation({ summary: 'Get workflow engine health status' })
+  @ApiResponse({ status: 200, description: 'Health status' })
+  async getHealth() {
+    try {
+      const health = await this.monitoringService.getSystemHealth();
+      return health;
+    } catch (error) {
+      throw new HttpException(error.message, HttpStatus.INTERNAL_SERVER_ERROR);
+    }
+  }
+
+  @Get('compensatable')
+  @ApiOperation({ summary: 'Get workflows that require compensation' })
+  @ApiResponse({ status: 200, description: 'Compensatable workflows' })
+  async getCompensatableWorkflows() {
+    try {
+      const workflows = await this.compensationService.getCompensatableWorkflows();
+      return { workflows };
+    } catch (error) {
+      throw new HttpException(error.message, HttpStatus.INTERNAL_SERVER_ERROR);
+    }
+  }
+
+  @Post(':id/force-compensate')
+  @ApiOperation({ summary: 'Force compensate a workflow (admin only)' })
+  @ApiParam({ name: 'id', description: 'Workflow ID' })
+  @ApiResponse({ status: 200, description: 'Force compensation initiated' })
+  @ApiResponse({ status: 400, description: 'Force compensation failed' })
+  async forceCompensateWorkflow(@Param('id') id: string) {
+    try {
+      await this.compensationService.forceCompensateWorkflow(id);
+      return { message: 'Force compensation completed', workflowId: id };
+    } catch (error) {
+      throw new HttpException(error.message, HttpStatus.BAD_REQUEST);
+    }
   }
 }

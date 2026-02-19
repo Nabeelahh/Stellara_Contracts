@@ -45,7 +45,7 @@ describe('IndexMarketNewsProcessor', () => {
     });
 
     it('should throw error if source missing', async () => {
-      mockJob.data = { source: '' };
+      mockJob.data = { source: '', startDate: '2023-01-01', endDate: '2023-01-02', limit: 10 };
 
       await expect(processor.handleIndexMarketNews(mockJob as any)).rejects.toThrow(
         'Missing required field: source',
@@ -53,7 +53,7 @@ describe('IndexMarketNewsProcessor', () => {
     });
 
     it('should respect limit parameter', async () => {
-      mockJob.data = { source: 'coingecko', limit: 100 };
+      mockJob.data = { source: 'coingecko', startDate: '2023-01-01', endDate: '2023-01-02', limit: 100 };
       const result = await processor.handleIndexMarketNews(mockJob as any);
 
       expect(result.data.itemsProcessed).toBeGreaterThanOrEqual(0);
@@ -76,7 +76,7 @@ describe('IndexMarketNewsProcessor', () => {
     });
 
     it('should use default limit when not provided', async () => {
-      mockJob.data = { source: 'coingecko' };
+      mockJob.data = { source: 'coingecko', startDate: '2023-01-01', endDate: '2023-01-02', limit: 50 };
       const result = await processor.handleIndexMarketNews(mockJob as any);
 
       expect(result.data).toHaveProperty('itemsProcessed');

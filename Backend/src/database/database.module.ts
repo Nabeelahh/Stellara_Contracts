@@ -1,5 +1,14 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { MigrationExecutor } from './migration-executor';
+import { MigrationTestingService } from './migration-testing.service';
+import { MigrationManagerService } from './migration-manager.service';
+import {
+  MigrationValidator,
+  MigrationBackup,
+  MigrationRollback,
+  MigrationMetrics,
+} from './migration-strategy';
 
 @Module({
   imports: [
@@ -11,6 +20,24 @@ import { TypeOrmModule } from '@nestjs/typeorm';
       logging: process.env.NODE_ENV !== 'production',
     }),
   ],
-  exports: [TypeOrmModule],
+  providers: [
+    MigrationExecutor,
+    MigrationTestingService,
+    MigrationManagerService,
+    MigrationValidator,
+    MigrationBackup,
+    MigrationRollback,
+    MigrationMetrics,
+  ],
+  exports: [
+    TypeOrmModule,
+    MigrationExecutor,
+    MigrationTestingService,
+    MigrationManagerService,
+    MigrationValidator,
+    MigrationBackup,
+    MigrationRollback,
+    MigrationMetrics,
+  ],
 })
 export class DatabaseModule {}

@@ -6,8 +6,12 @@ import { WorkflowStep } from '../entities/workflow-step.entity';
 import { WorkflowState } from '../types/workflow-state.enum';
 import { StepState } from '../types/step-state.enum';
 import { WorkflowExecutionService } from './workflow-execution.service';
+import { CompensationService } from './compensation.service';
+import { RecoveryService } from './recovery.service';
+import { MonitoringService } from './monitoring.service';
 import { contractDeploymentWorkflow } from '../examples/contract-deployment.workflow';
 import { tradeExecutionWorkflow } from '../examples/trade-execution.workflow';
+import { aiJobChainWorkflow } from '../examples/ai-job-chain.workflow';
 
 @Injectable()
 export class WorkflowService implements OnModuleInit {
@@ -19,12 +23,16 @@ export class WorkflowService implements OnModuleInit {
     @InjectRepository(WorkflowStep)
     private readonly stepRepository: Repository<WorkflowStep>,
     private readonly workflowExecutionService: WorkflowExecutionService,
+    private readonly compensationService: CompensationService,
+    private readonly recoveryService: RecoveryService,
+    private readonly monitoringService: MonitoringService,
   ) {}
 
   async onModuleInit() {
     // Register built-in workflow definitions
     this.workflowExecutionService.registerWorkflowDefinition(contractDeploymentWorkflow);
     this.workflowExecutionService.registerWorkflowDefinition(tradeExecutionWorkflow);
+    this.workflowExecutionService.registerWorkflowDefinition(aiJobChainWorkflow);
     
     this.logger.log('WorkflowService initialized with built-in workflow definitions');
   }
@@ -124,6 +132,62 @@ export class WorkflowService implements OnModuleInit {
   }
 
   /**
+   * Retry a failed workflow
+   */
+  async retryWorkflow(workflowId: string): Promise<void> {
+    await this.workflowExecutionService.retryWorkflow(workflowId);
+  }
+
+  /**
+   * Compensate a failed workflow
+   */
+  async compensateWorkflow(workflowId: string): Promise<void> {
+    await this.compensationService.compensateWorkflow(workflowId);
+  }
+
+  /**
+   * Get compensatable workflows
+   */
+  async getCompensatableWorkflows(): Promise<Workflow[]> {
+    return await this.compensationService.getCompensatableWorkflows();
+  }
+
+  /**
+   * Trigger manual recovery
+   */
+  async triggerRecovery(): Promise<any> {
+    return await this.recoveryService.triggerManualRecovery();
+  }
+
+  /**
+   * Get workflow metrics
+   */
+  async getWorkflowMetrics(timeRangeHours: number = 24): Promise<any> {
+    return await this.monitoringService.getWorkflowMetrics(timeRangeHours);
+  }
+
+  /**
+   * Get step metrics
+   */
+  async getStepMetrics(timeRangeHours: number = 24): Promise<any> {
+    return await this.monitoringService.getStepMetrics(timeRangeHours);
+  }
+
+  /**
+   * Get workflow timeline for debugging
+   */
+  async getWorkflowTimeline(workflowId: string): Promise<any> {
+    return await this.monitoringService.getWorkflowTimeline(workflowId);
+  }
+
+  /**
+   * Get system health status
+   */
+  async getSystemHealth(): Promise<any> {
+    return await this.monitoringService.getSystemHealth();
+  }
+
+  /**
    * Get failed workflows that can be retried
    */
   async getRetryableWorkflows(): Promise<Workflow[]> {
@@ -157,123 +221,6 @@ export class WorkflowService implements OnModuleInit {
    */
   async cancelWorkflow(id: string): Promise<void> {
     await this.workflowExecutionService.cancelWorkflow(id);
-  }
-
-  /**
-   * Retry a failed workflow
-   */
-  async retryWorkflow(id: string): Promise<void> {
-    await this.workflowExecutionService.retryWorkflow(id);
-  }
-
-  /**
-   * Compensate a workflow
-   */
-  async compensateWorkflow(id: string): Promise<void> {
-    await this.workflowExecutionService.compensateWorkflow(id);
-  }
-
-  /**
-   * Get workflow statistics
-   */
-  async getWorkflowStats(): Promise<any> {
-    const stats = await this.workflowRepository
-      .createQueryBuilder('workflow')
-      .select('workflow.state', 'state')
-      .addSelect('COUNT(*)', 'count')
-      .groupBy('workflow.state')
-      .getRawMany();
-
-    const totalWorkflows = stats.reduce((sum, stat) => sum + parseInt(stat.count), 0);
-    const stateStats = stats.reduce((acc, stat) => {
-      acc[stat.state] = parseInt(stat.count);
-      return acc;
-    }, {});
-
-    // Get step stats
-    const stepStats = await this.stepRepository
-      .createQueryBuilder('step')
-      .select('step.state', 'state')
-      .addSelect('COUNT(*)', 'count')
-      .groupBy('step.state')
-      .getRawMany();
-
-    const totalSteps = stepStats.reduce((sum, stat) => sum + parseInt(stat.count), 0);
-    const stepStateStats = stepStats.reduce((acc, stat) => {
-      acc[stat.state] = parseInt(stat.count);
-      return acc;
-    }, {});
-
-    return {
-      workflows: {
-        total: totalWorkflows,
-        byState: stateStats,
-      },
-      steps: {
-        total: totalSteps,
-        byState: stepStateStats,
-      },
-    };
-  }
-
-  /**
-   * Search workflows by idempotency key
-   */
-  async searchByIdempotencyKey(idempotencyKey: string): Promise<Workflow | null> {
-    return await this.workflowRepository.findOne({
-      where: { idempotencyKey },
-      relations: ['steps'],
-    });
-  }
-
-  /**
-   * Get workflow execution summary
-   */
-  async getWorkflowExecutionSummary(id: string): Promise<any> {
-    const workflow = await this.getWorkflow(id);
-    
-    if (!workflow) {
-      throw new Error('Workflow not found');
-    }
-
-    const completedSteps = workflow.steps.filter(step => 
-      [StepState.COMPLETED, StepState.SKIPPED].includes(step.state)
-    ).length;
-    
-    const failedSteps = workflow.steps.filter(step => step.state === StepState.FAILED).length;
-    const runningSteps = workflow.steps.filter(step => step.state === StepState.RUNNING).length;
-    
-    const totalExecutionTime = workflow.completedAt && workflow.startedAt
-      ? workflow.completedAt.getTime() - workflow.startedAt.getTime()
-      : null;
-
-    return {
-      workflowId: workflow.id,
-      type: workflow.type,
-      state: workflow.state,
-      progress: {
-        totalSteps: workflow.totalSteps,
-        completedSteps,
-        failedSteps,
-        runningSteps,
-        currentStep: workflow.currentStepIndex,
-        completionPercentage: Math.round((completedSteps / workflow.totalSteps) * 100),
-      },
-      timing: {
-        createdAt: workflow.createdAt,
-        startedAt: workflow.startedAt,
-        completedAt: workflow.completedAt,
-        totalExecutionTime,
-        averageStepTime: totalExecutionTime && completedSteps > 0
-          ? totalExecutionTime / completedSteps
-          : null,
-      },
-      retries: {
-        workflowRetries: workflow.retryCount,
-        maxRetries: workflow.maxRetries,
-        stepRetries: workflow.steps.reduce((sum, step) => sum + step.retryCount, 0),
-      },
-    };
   }
 
   /**

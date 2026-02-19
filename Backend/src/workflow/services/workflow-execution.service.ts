@@ -1,14 +1,14 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Repository, LessThan } from 'typeorm';
+import { v4 as uuidv4 } from 'uuid';
 import { Workflow } from '../entities/workflow.entity';
 import { WorkflowStep } from '../entities/workflow-step.entity';
+import { WorkflowDefinition, StepDefinition, WorkflowContext } from '../types';
 import { WorkflowState } from '../types/workflow-state.enum';
 import { StepState } from '../types/step-state.enum';
-import { WorkflowDefinition, StepDefinition, WorkflowContext } from '../types';
 import { WorkflowStateMachineService } from './workflow-state-machine.service';
 import { IdempotencyService } from './idempotency.service';
-import { LessThan } from 'typeorm';
 
 @Injectable()
 export class WorkflowExecutionService {
@@ -371,123 +371,14 @@ export class WorkflowExecutionService {
    * Compensate a workflow
    */
   async compensateWorkflow(workflowId: string): Promise<void> {
-    const workflow = await this.workflowRepository.findOne({
-      where: { id: workflowId },
-      relations: ['steps'],
-    });
-
-    if (!workflow) {
-      throw new Error(`Workflow not found: ${workflowId}`);
-    }
-
-    if (!this.stateMachine.canWorkflowCompensate(workflow.state)) {
-      throw new Error(`Workflow ${workflowId} cannot be compensated`);
-    }
-
-    const transition = this.stateMachine.transitionWorkflow(workflow.state, WorkflowState.COMPENSATING);
-    if (!transition.success) {
-      throw new Error(`Cannot start compensation: ${transition.error}`);
-    }
-
-    workflow.state = WorkflowState.COMPENSATING;
-    await this.workflowRepository.save(workflow);
-
-    try {
-      await this.executeCompensation(workflow);
-      
-      workflow.state = WorkflowState.COMPENSATED;
-      workflow.isCompensated = true;
-      await this.workflowRepository.save(workflow);
-      
-      this.logger.log(`Workflow compensated successfully: ${workflowId}`);
-    } catch (error) {
-      this.logger.error(`Workflow compensation failed: ${workflowId}`, error);
-      
-      workflow.state = WorkflowState.FAILED;
-      await this.workflowRepository.save(workflow);
-      
-      throw error;
-    }
+    // This will be handled by the CompensationService
+    throw new Error('Use CompensationService.compensateWorkflow() instead');
   }
 
   /**
-   * Execute compensation for all completed steps in reverse order
+   * Helper function to delay execution
    */
-  private async executeCompensation(workflow: Workflow): Promise<void> {
-    const definition = this.getWorkflowDefinition(workflow.type);
-    if (!definition) {
-      throw new Error(`Workflow definition not found for type: ${workflow.type}`);
-    }
-
-    const steps = await this.stepRepository.find({
-      where: { workflowId: workflow.id },
-      order: { stepIndex: 'DESC' }, // Reverse order for compensation
-    });
-
-    for (const step of steps) {
-      if (!this.stateMachine.canStepCompensate(step.state) || !step.requiresCompensation) {
-        continue;
-      }
-
-      const stepDefinition = definition.steps[step.stepIndex];
-      if (!stepDefinition.compensate) {
-        continue;
-      }
-
-      await this.compensateStep(workflow, step, stepDefinition);
-    }
-  }
-
-  /**
-   * Compensate a single step
-   */
-  private async compensateStep(
-    workflow: Workflow,
-    step: WorkflowStep,
-    stepDefinition: StepDefinition,
-  ): Promise<void> {
-    this.logger.debug(`Compensating step: ${step.stepName} for workflow: ${workflow.id}`);
-
-    step.state = StepState.COMPENSATING;
-    await this.stepRepository.save(step);
-
-    try {
-      const context: WorkflowContext = {
-        workflowId: workflow.id,
-        idempotencyKey: workflow.idempotencyKey,
-        userId: workflow.userId,
-        walletAddress: workflow.walletAddress,
-        type: workflow.type,
-        retryCount: step.retryCount,
-        stepIndex: step.stepIndex,
-        metadata: workflow.context,
-      };
-
-      if (stepDefinition.compensate) {
-        await stepDefinition.compensate(step.input, step.output, context);
-      }
-
-      step.state = StepState.COMPENSATED;
-      step.isCompensated = true;
-      step.compensatedAt = new Date();
-      await this.stepRepository.save(step);
-
-      this.logger.debug(`Step compensated successfully: ${step.stepName}`);
-
-    } catch (error) {
-      this.logger.error(`Step compensation failed: ${step.stepName}`, error);
-      
-      step.state = StepState.FAILED;
-      await this.stepRepository.save(step);
-      
-      throw error;
-    }
-  }
-
-  /**
-   * Utility function for delays
-   */
-  private delay(ms: number): Promise<void> {
+  private async delay(ms: number): Promise<void> {
     return new Promise(resolve => setTimeout(resolve, ms));
   }
 }

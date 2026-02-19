@@ -1,4 +1,8 @@
 use soroban_sdk::{contracttype, Address, Env, Vec, Symbol, symbol_short};
+use crate::events::{
+    EventEmitter, ProposalCreatedEvent, ProposalApprovedEvent, ProposalRejectedEvent,
+    ProposalExecutedEvent, ProposalCancelledEvent,
+};
 
 /// Upgrade proposal that must be approved via governance
 #[contracttype]
@@ -114,6 +118,12 @@ impl GovernanceManager {
 
         let next_id = proposal_id + 1;
 
+        // Clone values for event emission before moving into proposal
+        let event_proposer = proposer.clone();
+        let event_new_contract_hash = new_contract_hash.clone();
+        let event_target_contract = target_contract.clone();
+        let event_description = description.clone();
+
         let proposal = UpgradeProposal {
             id: next_id,
             proposer,
@@ -144,6 +154,18 @@ impl GovernanceManager {
         env.storage()
             .persistent()
             .set(&proposal_counter_key, &next_id);
+
+        // Emit proposal created event
+        EventEmitter::proposal_created(env, ProposalCreatedEvent {
+            proposal_id: next_id,
+            proposer: event_proposer,
+            new_contract_hash: event_new_contract_hash,
+            target_contract: event_target_contract,
+            description: event_description,
+            approval_threshold,
+            timelock_delay,
+            timestamp: env.ledger().timestamp(),
+        });
 
         Ok(next_id)
     }
@@ -191,7 +213,7 @@ impl GovernanceManager {
         }
 
         // Record approval
-        approvals.set((proposal_id, approver), true);
+        approvals.set((proposal_id, approver.clone()), true);
         env.storage().persistent().set(&approvals_key, &approvals);
 
         // Increment approval count
@@ -202,8 +224,20 @@ impl GovernanceManager {
             proposal.status = ProposalStatus::Approved;
         }
 
+        let current_approvals = proposal.approvals_count;
+        let threshold = proposal.approval_threshold;
+
         proposals.set(proposal_id, proposal);
         env.storage().persistent().set(&proposals_key, &proposals);
+
+        // Emit proposal approved event
+        EventEmitter::proposal_approved(env, ProposalApprovedEvent {
+            proposal_id,
+            approver,
+            current_approvals,
+            threshold,
+            timestamp: env.ledger().timestamp(),
+        });
 
         Ok(())
     }
@@ -242,8 +276,18 @@ impl GovernanceManager {
         proposal.executed = true;
         proposal.status = ProposalStatus::Executed;
 
+        let new_contract_hash = proposal.new_contract_hash.clone();
+
         proposals.set(proposal_id, proposal);
         env.storage().persistent().set(&proposals_key, &proposals);
+
+        // Emit proposal executed event
+        EventEmitter::proposal_executed(env, ProposalExecutedEvent {
+            proposal_id,
+            executor,
+            new_contract_hash,
+            timestamp: env.ledger().timestamp(),
+        });
 
         Ok(())
     }
@@ -275,6 +319,13 @@ impl GovernanceManager {
         proposals.set(proposal_id, proposal);
         env.storage().persistent().set(&proposals_key, &proposals);
 
+        // Emit proposal rejected event
+        EventEmitter::proposal_rejected(env, ProposalRejectedEvent {
+            proposal_id,
+            rejector,
+            timestamp: env.ledger().timestamp(),
+        });
+
         Ok(())
     }
 
@@ -304,6 +355,13 @@ impl GovernanceManager {
         proposal.status = ProposalStatus::Cancelled;
         proposals.set(proposal_id, proposal);
         env.storage().persistent().set(&proposals_key, &proposals);
+
+        // Emit proposal cancelled event
+        EventEmitter::proposal_cancelled(env, ProposalCancelledEvent {
+            proposal_id,
+            cancelled_by: admin,
+            timestamp: env.ledger().timestamp(),
+        });
 
         Ok(())
     }
