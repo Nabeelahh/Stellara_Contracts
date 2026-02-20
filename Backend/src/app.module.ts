@@ -6,6 +6,10 @@ import { APP_GUARD } from '@nestjs/core';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 
+// logging and error handling
+import { LoggingModule } from './logging/logging.module';
+import { StructuredLogger } from './logging/structured-logger.service';
+
 import { RedisModule } from './redis/redis.module';
 import { VoiceModule } from './voice/voice.module';
 // DatabaseModule removed - using PostgreSQL config in this module instead
@@ -72,6 +76,9 @@ import { ThrottleModule } from './throttle/throttle.module';
     MarketDataModule,
     AuditModule,
     ThrottleModule,
+
+    // add logging globally so middleware is applied early
+    LoggingModule,
   ],
 
   controllers: [AppController],
@@ -86,6 +93,11 @@ import { ThrottleModule } from './throttle/throttle.module';
     {
       provide: APP_GUARD,
       useClass: RolesGuard,
+    },
+    // replace the default Nest logger with our structured implementation
+    {
+      provide: Logger,
+      useClass: StructuredLogger,
     },
   ],
 })

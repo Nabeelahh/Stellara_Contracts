@@ -4,9 +4,13 @@ import { RedisIoAdapter } from './websocket/redis-io.adapter';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { ValidationPipe } from '@nestjs/common';
 import { ThrottleGuard } from './throttle/throttle.guard';
+import { StructuredLogger } from './logging/structured-logger.service';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
+  // swap out Nest's default logger with our structured implementation
+  const logger = app.get(StructuredLogger);
+  app.useLogger(logger);
 
   // Enable validation globally
   app.useGlobalPipes(
@@ -35,6 +39,15 @@ async function bootstrap() {
   app.useWebSocketAdapter(redisIoAdapter);
   app.useGlobalGuards(app.get(ThrottleGuard));
 
+  // register global exception filter so every error passes through structured logging
+  app.useGlobalFilters(app.get(require('./logging/all-exceptions.filter').AllExceptionsFilter));
+
+  // expose Prometheus metrics on a simple endpoint
+  const metricsService = app.get(require('./logging/metrics.service').MetricsService);
+  app.get('/metrics', async (_req, res) => {
+    res.set('Content-Type', 'text/plain');
+    res.send(await metricsService.getMetrics());
+  });
 
   await app.listen(process.env.PORT ?? 3000);
 }
