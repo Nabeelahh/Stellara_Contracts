@@ -111,7 +111,7 @@ pub fn get_trader_trades(env: &Env, trader: &Address) -> Vec<OptimizedTrade> {
 - Migrated from `symbol_short!()` keys to enum-based `TradingDataKey`
 - Moved admin, stats, oracle config to instance storage
 - Individual trade storage with trader indexing
-- Added recent trades buffer (circular buffer of last 100 trades)
+- Added recent trades buffer (circular buffer of last 100 trades) with optimized trimming to keep only the most recent entries in a single pass
 - Migration support from v1 to v2
 
 **Storage Keys:**

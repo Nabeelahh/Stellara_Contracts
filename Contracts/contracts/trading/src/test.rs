@@ -6,14 +6,7 @@ use super::*;
 use soroban_sdk::{testutils::Address as _, testutils::Ledger as _, testutils::Events as _, token, Address, Env, Symbol, Vec, IntoVal};
 use shared::governance::ProposalStatus;
 use shared::fees::FeeError;
-use std::sync::Mutex;
-
 // Temporarily disable serial lock to fix CI
-// static TEST_LOCK: Mutex<()> = Mutex::new(());
-
-// fn serial_lock() -> std::sync::MutexGuard<'static, ()> {
-//     TEST_LOCK.lock().expect("test lock poisoned")
-// }
 
 fn setup_env() -> (Env, Address, Address, Address, Address) {
     let env = Env::default();

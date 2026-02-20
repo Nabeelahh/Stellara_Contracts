@@ -1,6 +1,6 @@
 #[cfg(test)]
 mod test {
-    use crate::{AcademyRewardsContract, AcademyRewardsContractClient, Badge, BadgeMetadata, ContractError, DataKey};
+    use crate::{AcademyRewardsContract, AcademyRewardsContractClient, BadgeMetadata, ContractError, DataKey};
     use soroban_sdk::{testutils::Address as _, testutils::Ledger as _, Address, Env, String};
 
     fn setup_env() -> (Env, Address, Address, Address) {

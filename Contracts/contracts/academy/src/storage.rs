@@ -262,6 +262,11 @@ mod tests {
             _ => panic!("Expected Init"),
         }
         
+        match key2 {
+            AcademyDataKey::Counter => (),
+            _ => panic!("Expected Counter"),
+        }
+        
         match key3 {
             AcademyDataKey::Schedule(id) => assert_eq!(id, 1),
             _ => panic!("Expected Schedule"),

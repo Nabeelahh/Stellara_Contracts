@@ -147,7 +147,7 @@ proptest! {
     /// --------------------------------
     #[test]
     fn ownership_invariant(
-        supply in 1_000i128..1_000_000i128,
+        _supply in 1_000i128..1_000_000i128,
         mint_amount in 1i128..100_000i128,
     ) {
         let env = Env::default();

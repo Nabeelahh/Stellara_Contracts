@@ -152,6 +152,7 @@ impl SocialRewardsStorage {
     }
     
     /// Check if reward exists
+    #[allow(dead_code)]
     pub fn has_reward(env: &Env, reward_id: u64) -> bool {
         env.storage().persistent().has(&SocialRewardsDataKey::Reward(reward_id))
     }
@@ -201,6 +202,7 @@ impl SocialRewardsStorage {
     }
     
     /// Get pending (unclaimed) rewards for a user with lazy loading
+    #[allow(dead_code)]
     pub fn get_user_pending_rewards(env: &Env, user: &Address) -> Vec<OptimizedReward> {
         let reward_ids = Self::get_user_reward_ids(env, user);
         let mut pending = Vec::new(env);
@@ -269,6 +271,7 @@ impl SocialRewardsStorage {
     // ============ Batch Operations ============
     
     /// Batch set rewards - more efficient for bulk operations
+    #[allow(dead_code)]
     pub fn batch_set_rewards(env: &Env, rewards: &[OptimizedReward]) {
         for reward in rewards.iter() {
             Self::set_reward(env, reward);
@@ -276,6 +279,7 @@ impl SocialRewardsStorage {
     }
     
     /// Batch update rewards
+    #[allow(dead_code)]
     pub fn batch_update_rewards(env: &Env, rewards: &[OptimizedReward]) {
         for reward in rewards.iter() {
             Self::update_reward(env, reward);
@@ -285,6 +289,7 @@ impl SocialRewardsStorage {
     // ============ Migration Support ============
     
     /// Check if migration is needed
+    #[allow(dead_code)]
     pub fn needs_migration(env: &Env) -> bool {
         Self::get_version(env) < CONTRACT_VERSION
     }
@@ -367,6 +372,11 @@ mod tests {
         match key1 {
             SocialRewardsDataKey::Init => (),
             _ => panic!("Expected Init"),
+        }
+        
+        match key2 {
+            SocialRewardsDataKey::Stats => (),
+            _ => panic!("Expected Stats"),
         }
         
         match key3 {

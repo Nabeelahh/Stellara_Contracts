@@ -20,12 +20,13 @@
 //! - Settlement consumes nullifiers to prevent double-spending
 
 #![no_std]
+#![allow(unexpected_cfgs)]
 
 use soroban_sdk::{contract, contractimpl, contracttype, Address, BytesN, Env, Symbol, Vec};
-use shared::privacy::{
-    utils, MerkleRoot, Nullifier, PedersenCommitment, PrivacyError, PrivacyPool,
-    PrivacyPoolDataKey, PrivateNote, RangeProof,
-};
+use shared::privacy::PrivacyPool;
+
+#[cfg(test)]
+use shared::privacy::utils;
 
 /// Trading error types
 #[contracttype]
@@ -549,7 +550,7 @@ mod tests {
 
     #[test]
     fn test_initialize() {
-        let (env, admin, base_token, quote_token, client) = setup_env();
+        let (_env, admin, base_token, quote_token, client) = setup_env();
 
         client.initialize(&admin, &base_token, &quote_token);
 
@@ -701,7 +702,7 @@ mod tests {
 
     #[test]
     fn test_pause_unpause() {
-        let (env, admin, base_token, quote_token, client) = setup_env();
+        let (_env, admin, base_token, quote_token, client) = setup_env();
 
         client.initialize(&admin, &base_token, &quote_token);
 

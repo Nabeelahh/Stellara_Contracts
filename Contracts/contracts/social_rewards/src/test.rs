@@ -311,7 +311,7 @@ fn test_add_reward_emits_event() {
         if let Some(first_topic) = topics.first() {
             let topic_str: Result<Symbol, _> = first_topic.clone().try_into_val(&env);
             if let Ok(sym) = topic_str {
-                return sym == symbol_short!("reward");
+                return sym == Symbol::new(&env, "reward");
             }
         }
         false
@@ -342,7 +342,7 @@ fn test_claim_reward_emits_event() {
         if let Some(first_topic) = topics.first() {
             let topic_str: Result<Symbol, _> = first_topic.clone().try_into_val(&env);
             if let Ok(sym) = topic_str {
-                return sym == symbol_short!("claimed");
+                return sym == Symbol::new(&env, "claimed");
             }
         }
         false
@@ -372,7 +372,7 @@ fn test_multiple_rewards_emit_multiple_events() {
         if let Some(first_topic) = topics.first() {
             let topic_str: Result<Symbol, _> = first_topic.clone().try_into_val(&env);
             if let Ok(sym) = topic_str {
-                return sym == symbol_short!("reward");
+                return sym == Symbol::new(&env, "reward");
             }
         }
         false
@@ -441,7 +441,7 @@ fn test_batch_add_reward_size_limit() {
 
     // Create batch with more than MAX_BATCH_SIZE (30) requests
     let mut requests = Vec::new(&env);
-    for i in 0..31 {
+    for _i in 0..31 {
         requests.push_back(BatchRewardRequest {
             user: user.clone(),
             amount: 10,
@@ -673,7 +673,7 @@ fn test_batch_operations_emit_events() {
         if let Some(first_topic) = topics.first() {
             let topic_str: Result<Symbol, _> = first_topic.clone().try_into_val(&env);
             if let Ok(sym) = topic_str {
-                return sym == symbol_short!("reward");
+                return sym == Symbol::new(&env, "reward");
             }
         }
         false

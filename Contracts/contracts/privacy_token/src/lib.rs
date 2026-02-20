@@ -25,12 +25,16 @@
 //! 3. **Withdraw**: User proves ownership via nullifier and withdraws tokens
 
 #![no_std]
+#![allow(unexpected_cfgs)]
 
-use soroban_sdk::{contract, contractimpl, contracttype, Address, BytesN, Env, Symbol, Vec};
+use soroban_sdk::{contract, contractimpl, contracttype, Address, BytesN, Env, Symbol};
 use shared::privacy::{
-    utils, MerkleRoot, Nullifier, PedersenCommitment, PrivacyError, PrivacyPool,
-    PrivacyPoolConfig, PrivacyPoolDataKey, PrivateNote, RangeProof,
+    MerkleRoot, Nullifier, PedersenCommitment, PrivacyError, PrivacyPool, PrivacyPoolConfig,
+    PrivacyPoolDataKey, RangeProof,
 };
+
+#[cfg(test)]
+use shared::privacy::utils;
 
 /// Contract error types
 #[contracttype]

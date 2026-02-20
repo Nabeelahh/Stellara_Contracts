@@ -1,12 +1,6 @@
 use super::*;
 use soroban_sdk::{testutils::Address as _, testutils::Ledger as _, token, Address, Env, Vec};
 
-fn set_timestamp(env: &Env, timestamp: u64) {
-    let mut ledger_info = env.ledger().get();
-    ledger_info.timestamp = timestamp;
-    env.ledger().set(ledger_info);
-}
-
     fn setup_env() -> (Env, Address, Address, Address, Address) {
         let env = Env::default();
         env.mock_all_auths();

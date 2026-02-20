@@ -19,7 +19,7 @@
 //! - Production use should consider using Groth16 SNARKs for stronger privacy guarantees
 //! - The Merkle tree depth limits the number of commitments (2^depth)
 
-use soroban_sdk::{contracttype, Address, BytesN, Env, Vec};
+use soroban_sdk::{contracttype, Address, BytesN, Env};
 
 /// Merkle tree depth - supports up to 2^20 = 1,048,576 commitments
 pub const MERKLE_TREE_DEPTH: u32 = 20;
@@ -155,7 +155,7 @@ pub struct PrivacyPool;
 
 impl PrivacyPool {
     /// Initialize a new privacy pool
-    pub fn initialize(env: &Env, config: &PrivacyPoolConfig) {
+    pub fn initialize(env: &Env, _config: &PrivacyPoolConfig) {
         // Store config in instance storage
         env.storage().instance().set(&PrivacyPoolDataKey::Root, &MerkleRoot {
             hash: BytesN::from_array(env, &[0u8; 32]),
@@ -217,7 +217,7 @@ impl PrivacyPool {
     pub fn deposit(
         env: &Env,
         commitment: &BytesN<32>,
-        amount: i128,
+        _amount: i128,
     ) -> Result<u32, PrivacyError> {
         // Get next leaf index
         let leaf_index: u32 = env
@@ -255,8 +255,8 @@ impl PrivacyPool {
     pub fn withdraw(
         env: &Env,
         nullifier_hash: &BytesN<32>,
-        recipient: &Address,
-        amount: i128,
+        _recipient: &Address,
+        _amount: i128,
     ) -> Result<(), PrivacyError> {
         // Check if nullifier has been spent
         if let Some(nullifier) = env
@@ -429,7 +429,7 @@ pub mod utils {
         }
 
         // Verify nullifier secret
-        let computed_nullifier = PrivacyPool::compute_nullifier_hash(
+        let _computed_nullifier = PrivacyPool::compute_nullifier_hash(
             env,
             &note.nullifier_secret,
         );
