@@ -2,6 +2,7 @@ import { Entity, PrimaryGeneratedColumn, Column, OneToMany, CreateDateColumn, Up
 import { WalletBinding } from './wallet-binding.entity';
 import { RefreshToken } from './refresh-token.entity';
 import { ApiToken } from './api-token.entity';
+import { Consent } from '../../gdpr/entities/consent.entity';
 
 @Entity('users')
 export class User {
@@ -31,4 +32,7 @@ export class User {
 
   @OneToMany(() => ApiToken, (token) => token.user)
   apiTokens: ApiToken[];
+
+  @OneToMany(() => Consent, (consent) => consent.user)
+  consents: Consent[];
 }

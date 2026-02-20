@@ -80,6 +80,9 @@ import { AuditModule } from '../audit/audit.module';
     RolesGuard,
   ],
   exports: [
+    // Export TypeOrmModule so that repositories defined here (User, WalletBinding, etc.)
+    // are available to any module that imports AuthModule (e.g. GdprModule).
+    TypeOrmModule,
     JwtAuthService,
     ApiTokenService,
     WalletService,

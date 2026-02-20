@@ -30,6 +30,8 @@ import { RefreshToken } from './auth/entities/refresh-token.entity';
 import { ApiToken } from './auth/entities/api-token.entity';
 import { AuditModule } from './audit/audit.module';
 import { AuditLog } from './audit/audit.entity';
+import { GdprModule } from './gdpr/gdpr.module';
+import { Consent } from './gdpr/entities/consent.entity';
 import { VoiceJob } from './voice/entities/voice-job.entity';
 import { ThrottleModule } from './throttle/throttle.module';
 
@@ -63,6 +65,7 @@ import { ThrottleModule } from './throttle/throttle.module';
           RefreshToken,
           ApiToken,
           AuditLog,
+          Consent,
           VoiceJob,
         ],
         synchronize: configService.get('NODE_ENV') === 'development',
@@ -78,6 +81,7 @@ import { ThrottleModule } from './throttle/throttle.module';
     QueueModule,
     MarketDataModule,
     AuditModule,
+    GdprModule,
     ThrottleModule,
   ],
 

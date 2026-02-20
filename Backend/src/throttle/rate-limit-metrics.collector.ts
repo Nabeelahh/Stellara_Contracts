@@ -176,9 +176,9 @@ export class RateLimitMetricsCollector {
   }
 
   /**
-   * Get metrics in Prometheus format
+   * Get Prometheus metrics as string
    */
-  getPrometheusMetrics(): string {
-    return register.metrics();
+  async getPrometheusMetrics(): Promise<string> {
+    return await register.metrics();
   }
 }

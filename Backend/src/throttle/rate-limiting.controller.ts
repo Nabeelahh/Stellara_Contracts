@@ -4,19 +4,11 @@
  */
 
 import {
-  Controller,
-  Get,
-  Post,
-  Delete,
-  Param,
-  Query,
-  Body,
-  UseGuards,
-  HttpCode,
-} from '@nestjs/common';
+  Controller, Get, Post, Delete, Param, Query, Body, UseGuards, HttpCode } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
 import { RolesGuard } from '../auth/guards/roles.guard';
-import { RolesDecorator } from '../decorators/roles.decorator';
+import { Roles } from '../decorators/roles.decorator';
+import { Role } from '../auth/roles.enum'; // Use the main Role enum
 import { DistributedRateLimitService, RateLimitIdentifier } from './distributed-rate-limit.service';
 import { RoleBasedRateLimitService, EndpointCategory, UserRole } from './role-based-rate-limit.service';
 import { RateLimitMetricsCollector } from './rate-limit-metrics.collector';
@@ -25,7 +17,7 @@ import { RateLimitConfig } from './rate-limit-strategies';
 @ApiTags('Rate Limiting Management')
 @Controller('api/admin/rate-limits')
 @UseGuards(RolesGuard)
-@RolesDecorator([UserRole.ADMIN, UserRole.SYSTEM])
+@Roles(Role.ADMIN, Role.SUPERADMIN) // Use main Role enum values
 export class RateLimitingController {
   constructor(
     private readonly rateLimitService: DistributedRateLimitService,

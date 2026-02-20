@@ -62,7 +62,7 @@ export class SlidingWindowLogStrategy implements RateLimitStrategy {
 
     // Add current request if allowed
     if (allowed) {
-      await this.redis.zAdd(logKey, { score: now, member: `${now}:${Math.random()}` });
+      await this.redis.zAdd(logKey, [{ score: now, value: `${now}:${Math.random()}` }]);
     }
 
     // Set expiration
