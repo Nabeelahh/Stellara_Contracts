@@ -3,7 +3,7 @@
 extern crate std;
 
 use super::*;
-use soroban_sdk::{testutils::Address as _, testutils::Ledger as _, testutils::Events, token, Address, Env, Symbol, TryIntoVal};
+use soroban_sdk::{testutils::Address as _, testutils::Ledger as _, testutils::Events, token, Address, Env, Symbol, TryIntoVal, Vec};
 
 fn setup_env() -> (Env, Address, Address, Address) {
     let env = Env::default();
@@ -379,4 +379,300 @@ fn test_multiple_rewards_emit_multiple_events() {
     }).count();
 
     assert_eq!(reward_event_count, 3, "Expected 3 reward events, got {}", reward_event_count);
+}
+
+// =============================================================================
+// Batch Operations Tests
+// =============================================================================
+
+#[test]
+fn test_batch_add_reward_happy_path() {
+    let (env, admin, user1, contract_id) = setup_env();
+    let user2 = Address::generate(&env);
+    let (token_id, _token_client, _token_admin) = setup_token(&env);
+    let client = SocialRewardsContractClient::new(&env, &contract_id);
+
+    client.init(&admin, &token_id);
+
+    let mut requests = Vec::new(&env);
+    requests.push_back(BatchRewardRequest {
+        user: user1.clone(),
+        amount: 100,
+        reward_type: Symbol::new(&env, "referral"),
+        reason: Symbol::new(&env, "test1"),
+    });
+    requests.push_back(BatchRewardRequest {
+        user: user2.clone(),
+        amount: 200,
+        reward_type: Symbol::new(&env, "engagement"),
+        reason: Symbol::new(&env, "test2"),
+    });
+
+    let result = client.batch_add_reward(&admin, &requests);
+
+    assert_eq!(result.successful_rewards.len(), 2);
+    assert_eq!(result.failed_rewards.len(), 2);
+    assert_eq!(result.total_amount_granted, 300);
+    assert!(result.gas_saved > 0);
+
+    // Verify rewards were created
+    let user1_rewards = client.get_user_rewards(&user1);
+    assert_eq!(user1_rewards.len(), 1);
+    assert_eq!(user1_rewards[0], 1);
+
+    let user2_rewards = client.get_user_rewards(&user2);
+    assert_eq!(user2_rewards.len(), 1);
+    assert_eq!(user2_rewards[0], 2);
+
+    // Check stats
+    let stats = client.get_stats();
+    assert_eq!(stats.total_rewards, 2);
+    assert_eq!(stats.total_amount, 300);
+    assert_eq!(stats.last_reward_id, 2);
+}
+
+#[test]
+fn test_batch_add_reward_size_limit() {
+    let (env, admin, user, contract_id) = setup_env();
+    let (token_id, _token_client, _token_admin) = setup_token(&env);
+    let client = SocialRewardsContractClient::new(&env, &contract_id);
+
+    client.init(&admin, &token_id);
+
+    // Create batch with more than MAX_BATCH_SIZE (30) requests
+    let mut requests = Vec::new(&env);
+    for _ in 0..31 {
+        requests.push_back(BatchRewardRequest {
+            user: user.clone(),
+            amount: 10,
+            reward_type: Symbol::new(&env, "test"),
+            reason: Symbol::new(&env, "test"),
+        });
+    }
+
+    let result = client.try_batch_add_reward(&admin, &requests);
+    assert_eq!(result, Err(Ok(RewardError::BatchSizeExceeded)));
+}
+
+#[test]
+fn test_batch_add_reward_partial_failures() {
+    let (env, admin, user1, contract_id) = setup_env();
+    let user2 = Address::generate(&env);
+    let (token_id, _token_client, _token_admin) = setup_token(&env);
+    let client = SocialRewardsContractClient::new(&env, &contract_id);
+
+    client.init(&admin, &token_id);
+
+    let mut requests = Vec::new(&env);
+    // Valid request
+    requests.push_back(BatchRewardRequest {
+        user: user1.clone(),
+        amount: 100,
+        reward_type: Symbol::new(&env, "referral"),
+        reason: Symbol::new(&env, "valid"),
+    });
+    // Invalid request (negative amount)
+    requests.push_back(BatchRewardRequest {
+        user: user2.clone(),
+        amount: -50,
+        reward_type: Symbol::new(&env, "engagement"),
+        reason: Symbol::new(&env, "invalid"),
+    });
+
+    let result = client.batch_add_reward(&admin, &requests);
+
+    assert_eq!(result.successful_rewards.len(), 1);
+    assert_eq!(result.failed_rewards.len(), 2);
+    assert_eq!(result.total_amount_granted, 100);
+
+    // Verify only valid reward was created
+    let user1_rewards = client.get_user_rewards(&user1);
+    assert_eq!(user1_rewards.len(), 1);
+    assert_eq!(user1_rewards[0], 1);
+
+    let user2_rewards = client.get_user_rewards(&user2);
+    assert_eq!(user2_rewards.len(), 0);
+
+    let stats = client.get_stats();
+    assert_eq!(stats.total_rewards, 1);
+    assert_eq!(stats.total_amount, 100);
+}
+
+#[test]
+fn test_batch_claim_reward_happy_path() {
+    let (env, admin, user1, contract_id) = setup_env();
+    let user2 = Address::generate(&env);
+    let (token_id, token_client, token_admin) = setup_token(&env);
+    let client = SocialRewardsContractClient::new(&env, &contract_id);
+
+    client.init(&admin, &token_id);
+
+    // Fund contract
+    token_admin.mint(&contract_id, &500);
+
+    // Create rewards
+    let reward_id1 = client.add_reward(
+        &admin,
+        &user1,
+        &100,
+        &Symbol::new(&env, "referral"),
+        &Symbol::new(&env, "test1"),
+    );
+    let reward_id2 = client.add_reward(
+        &admin,
+        &user2,
+        &200,
+        &Symbol::new(&env, "engagement"),
+        &Symbol::new(&env, "test2"),
+    );
+
+    let mut requests = Vec::new(&env);
+    requests.push_back(BatchRewardClaimRequest {
+        reward_id: reward_id1,
+        user: user1.clone(),
+    });
+    requests.push_back(BatchRewardClaimRequest {
+        reward_id: reward_id2,
+        user: user2.clone(),
+    });
+
+    let results = client.batch_claim_reward(&requests);
+
+    assert_eq!(results.len(), 2);
+    assert!(results.get(0).unwrap().success);
+    assert!(results.get(1).unwrap().success);
+    assert_eq!(results.get(0).unwrap().amount_claimed, Some(100));
+    assert_eq!(results.get(1).unwrap().amount_claimed, Some(200));
+
+    // Check token balances
+    assert_eq!(token_client.balance(&user1), 100);
+    assert_eq!(token_client.balance(&user2), 200);
+
+    // Check stats
+    let stats = client.get_stats();
+    assert_eq!(stats.total_claimed, 300);
+}
+
+#[test]
+fn test_batch_claim_reward_size_limit() {
+    let (env, admin, user, contract_id) = setup_env();
+    let (token_id, _token_client, token_admin) = setup_token(&env);
+    let client = SocialRewardsContractClient::new(&env, &contract_id);
+
+    client.init(&admin, &token_id);
+    token_admin.mint(&contract_id, &5000);
+
+    // Create many rewards
+    for _i in 1..=26 {
+        client.add_reward(
+            &admin,
+            &user,
+            &100,
+            &Symbol::new(&env, "test"),
+            &Symbol::new(&env, "test"),
+        );
+    }
+
+    // Create batch with more than MAX_BATCH_SIZE (25) requests
+    let mut requests = Vec::new(&env);
+    for i in 1..=26 {
+        requests.push_back(BatchRewardClaimRequest {
+            reward_id: i,
+            user: user.clone(),
+        });
+    }
+
+    let result = client.try_batch_claim_reward(&requests);
+    assert_eq!(result, Err(Ok(RewardError::BatchSizeExceeded)));
+}
+
+#[test]
+fn test_batch_claim_reward_partial_failures() {
+    let (env, admin, user1, contract_id) = setup_env();
+    let user2 = Address::generate(&env);
+    let (token_id, token_client, token_admin) = setup_token(&env);
+    let client = SocialRewardsContractClient::new(&env, &contract_id);
+
+    client.init(&admin, &token_id);
+
+    // Fund contract with insufficient balance
+    token_admin.mint(&contract_id, &150);
+
+    // Create rewards
+    let reward_id1 = client.add_reward(
+        &admin,
+        &user1,
+        &100,
+        &Symbol::new(&env, "referral"),
+        &Symbol::new(&env, "test1"),
+    );
+    let reward_id2 = client.add_reward(
+        &admin,
+        &user2,
+        &200,
+        &Symbol::new(&env, "engagement"),
+        &Symbol::new(&env, "test2"),
+    );
+
+    let mut requests = Vec::new(&env);
+    requests.push_back(BatchRewardClaimRequest {
+        reward_id: reward_id1,
+        user: user1.clone(),
+    });
+    requests.push_back(BatchRewardClaimRequest {
+        reward_id: reward_id2,
+        user: user2.clone(),
+    });
+
+    let results = client.batch_claim_reward(&requests);
+
+    assert_eq!(results.len(), 2);
+    // First claim should succeed (enough balance), second should fail
+    assert!(results.get(0).unwrap().success);
+    assert!(!results.get(1).unwrap().success);
+    assert_eq!(results.get(0).unwrap().amount_claimed, Some(100));
+    assert_eq!(results.get(1).unwrap().amount_claimed, None);
+
+    // Check token balances
+    assert_eq!(token_client.balance(&user1), 100);
+    assert_eq!(token_client.balance(&user2), 0);
+
+    // Check stats
+    let stats = client.get_stats();
+    assert_eq!(stats.total_claimed, 100);
+}
+
+#[test]
+fn test_batch_operations_emit_events() {
+    let (env, admin, user1, contract_id) = setup_env();
+    let _user2 = Address::generate(&env);
+    let (token_id, _token_client, _token_admin) = setup_token(&env);
+    let client = SocialRewardsContractClient::new(&env, &contract_id);
+
+    client.init(&admin, &token_id);
+
+    // Test batch add reward events
+    let mut requests = Vec::new(&env);
+    requests.push_back(BatchRewardRequest {
+        user: user1.clone(),
+        amount: 100,
+        reward_type: Symbol::new(&env, "referral"),
+        reason: Symbol::new(&env, "test1"),
+    });
+
+    client.batch_add_reward(&admin, &requests);
+
+    let events = env.events().all();
+
+    // Should have reward event
+    let has_reward_event = events.iter().any(|(_, topics, _)| {
+        if let Some(first_topic) = topics.first() {
+            let topic_str: Result<Symbol, _> = first_topic.clone().try_into_val(&env);
+            if let Ok(sym) = topic_str {
+                return sym == symbol_short!("reward");
+            }
+        }
+        false
+    });
+    assert!(has_reward_event, "Reward event not found");
 }

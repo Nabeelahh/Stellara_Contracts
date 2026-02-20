@@ -14,6 +14,54 @@ pub struct VestingSchedule {
     pub revoke_time: u64,              // When it was revoked (0 if not revoked)
 }
 
+/// Batch vesting grant request
+#[contracttype]
+#[derive(Clone, Debug)]
+pub struct BatchVestingRequest {
+    pub beneficiary: Address,
+    pub amount: i128,
+    pub start_time: u64,
+    pub cliff: u64,
+    pub duration: u64,
+}
+
+/// Batch vesting result
+#[contracttype]
+#[derive(Clone, Debug)]
+pub struct BatchVestingResult {
+    pub grant_id: Option<u64>,
+    pub success: bool,
+    pub error_code: Option<u32>,
+}
+
+/// Batch claim request
+#[contracttype]
+#[derive(Clone, Debug)]
+pub struct BatchClaimRequest {
+    pub grant_id: u64,
+    pub beneficiary: Address,
+}
+
+/// Batch claim result
+#[contracttype]
+#[derive(Clone, Debug)]
+pub struct BatchClaimResult {
+    pub grant_id: u64,
+    pub amount_claimed: Option<i128>,
+    pub success: bool,
+    pub error_code: Option<u32>,
+}
+
+/// Batch vesting operation result
+#[contracttype]
+#[derive(Clone, Debug)]
+pub struct BatchVestingOperation {
+    pub successful_grants: soroban_sdk::Vec<u64>,
+    pub failed_grants: soroban_sdk::Vec<BatchVestingResult>,
+    pub total_amount_granted: i128,
+    pub gas_saved: i128,
+}
+
 /// Vesting grant event for off-chain indexing
 #[contracttype]
 #[derive(Clone, Debug)]
@@ -61,6 +109,8 @@ pub enum VestingError {
     Revoked = 4007,
     InvalidTimelock = 4008,
     NotEnoughTimeForRevoke = 4009,
+    BatchSizeExceeded = 4010,
+    BatchOperationFailed = 4011,
 }
 
 impl From<VestingError> for soroban_sdk::Error {
@@ -206,6 +256,275 @@ impl AcademyVestingContract {
         env.events().publish((symbol_short!("grant"),), grant_event);
 
         Ok(next_id)
+    }
+
+    /// Grant multiple vesting schedules in a single transaction
+    pub fn batch_grant_vesting(
+        env: Env,
+        admin: Address,
+        requests: soroban_sdk::Vec<BatchVestingRequest>,
+    ) -> Result<BatchVestingOperation, VestingError> {
+        // Maximum batch size to prevent resource exhaustion
+        const MAX_BATCH_SIZE: u32 = 25;
+        
+        if requests.len() > MAX_BATCH_SIZE {
+            return Err(VestingError::BatchSizeExceeded);
+        }
+
+        // Verify caller is admin
+        let admin_key = symbol_short!("admin");
+        let stored_admin: Address = env
+            .storage()
+            .persistent()
+            .get(&admin_key)
+            .ok_or(VestingError::Unauthorized)?;
+
+        if admin != stored_admin {
+            return Err(VestingError::Unauthorized);
+        }
+
+        let mut successful_grants = soroban_sdk::Vec::new(&env);
+        let mut failed_grants = soroban_sdk::Vec::new(&env);
+        let mut total_amount_granted = 0i128;
+
+        // Get current grant counter
+        let counter_key = symbol_short!("cnt");
+        let mut current_id: u64 = env
+            .storage()
+            .persistent()
+            .get(&counter_key)
+            .unwrap_or(0u64);
+
+        // Get existing schedules
+        let schedules_key = symbol_short!("sched");
+        let mut schedules: soroban_sdk::Map<u64, VestingSchedule> = env
+            .storage()
+            .persistent()
+            .get(&schedules_key)
+            .unwrap_or_else(|| soroban_sdk::Map::new(&env));
+
+        // Process each vesting request
+        for request in requests.iter() {
+            let result = match Self::process_single_vesting_grant(
+                &env,
+                &request,
+                &admin,
+                &mut current_id,
+                &mut schedules,
+            ) {
+                Ok(grant_id) => {
+                    successful_grants.push_back(grant_id);
+                    total_amount_granted += request.amount;
+                    BatchVestingResult {
+                        grant_id: Some(grant_id),
+                        success: true,
+                        error_code: None,
+                    }
+                }
+                Err(error) => BatchVestingResult {
+                    grant_id: None,
+                    success: false,
+                    error_code: Some(error as u32),
+                },
+            };
+
+            failed_grants.push_back(result);
+        }
+
+        // Update storage
+        env.storage().persistent().set(&schedules_key, &schedules);
+        env.storage().persistent().set(&counter_key, &current_id);
+
+        Ok(BatchVestingOperation {
+            successful_grants,
+            failed_grants,
+            total_amount_granted,
+            gas_saved: 0i128,
+        })
+    }
+
+    /// Process a single vesting grant within a batch operation
+    fn process_single_vesting_grant(
+        env: &Env,
+        request: &BatchVestingRequest,
+        admin: &Address,
+        current_id: &mut u64,
+        schedules: &mut soroban_sdk::Map<u64, VestingSchedule>,
+    ) -> Result<u64, VestingError> {
+        // Validate schedule
+        if request.amount <= 0 {
+            return Err(VestingError::InvalidSchedule);
+        }
+        if request.cliff > request.duration {
+            return Err(VestingError::InvalidSchedule);
+        }
+
+        // Increment grant ID
+        *current_id += 1;
+        let grant_id = *current_id;
+
+        // Create vesting schedule
+        let schedule = VestingSchedule {
+            beneficiary: request.beneficiary.clone(),
+            amount: request.amount,
+            start_time: request.start_time,
+            cliff: request.cliff,
+            duration: request.duration,
+            claimed: false,
+            revoked: false,
+            revoke_time: 0,
+        };
+
+        // Store schedule
+        schedules.set(grant_id, schedule);
+
+        // Emit grant event
+        let grant_event = GrantEvent {
+            grant_id,
+            beneficiary: request.beneficiary.clone(),
+            amount: request.amount,
+            start_time: request.start_time,
+            cliff: request.cliff,
+            duration: request.duration,
+            granted_at: env.ledger().timestamp(),
+            granted_by: admin.clone(),
+        };
+
+        env.events().publish((symbol_short!("grant"),), grant_event);
+
+        Ok(grant_id)
+    }
+
+    /// Claim multiple vested tokens in a single transaction
+    pub fn batch_claim(
+        env: Env,
+        requests: soroban_sdk::Vec<BatchClaimRequest>,
+    ) -> Result<soroban_sdk::Vec<BatchClaimResult>, VestingError> {
+        // Maximum batch size to prevent resource exhaustion
+        const MAX_BATCH_SIZE: u32 = 20;
+        
+        if requests.len() > MAX_BATCH_SIZE {
+            return Err(VestingError::BatchSizeExceeded);
+        }
+
+        let mut results = soroban_sdk::Vec::new(&env);
+
+        // Get token address once
+        let token_key = symbol_short!("token");
+        let token: Address = env
+            .storage()
+            .persistent()
+            .get(&token_key)
+            .ok_or(VestingError::Unauthorized)?;
+
+        let token_client = soroban_sdk::token::Client::new(&env, &token);
+
+        // Get schedules once
+        let schedules_key = symbol_short!("sched");
+        let mut schedules: soroban_sdk::Map<u64, VestingSchedule> = env
+            .storage()
+            .persistent()
+            .get(&schedules_key)
+            .ok_or(VestingError::GrantNotFound)?;
+
+        // Process each claim request
+        for request in requests.iter() {
+            request.beneficiary.require_auth();
+
+            let result = match Self::process_single_claim(
+                &env,
+                &request,
+                &mut schedules,
+                &token_client,
+            ) {
+                Ok(amount) => {
+                    BatchClaimResult {
+                        grant_id: request.grant_id,
+                        amount_claimed: Some(amount),
+                        success: true,
+                        error_code: None,
+                    }
+                }
+                Err(error) => BatchClaimResult {
+                    grant_id: request.grant_id,
+                    amount_claimed: None,
+                    success: false,
+                    error_code: Some(error as u32),
+                },
+            };
+
+            results.push_back(result);
+        }
+
+        // Update schedules in storage
+        env.storage().persistent().set(&schedules_key, &schedules);
+
+        Ok(results)
+    }
+
+    /// Process a single claim within a batch operation
+    fn process_single_claim(
+        env: &Env,
+        request: &BatchClaimRequest,
+        schedules: &mut soroban_sdk::Map<u64, VestingSchedule>,
+        token_client: &soroban_sdk::token::Client,
+    ) -> Result<i128, VestingError> {
+        let mut schedule = schedules
+            .get(request.grant_id)
+            .ok_or(VestingError::GrantNotFound)?;
+
+        // Verify beneficiary matches
+        if schedule.beneficiary != request.beneficiary {
+            return Err(VestingError::Unauthorized);
+        }
+
+        // Check if already claimed
+        if schedule.claimed {
+            return Err(VestingError::AlreadyClaimed);
+        }
+
+        // Check if revoked
+        if schedule.revoked {
+            return Err(VestingError::Revoked);
+        }
+
+        // Calculate vested amount
+        let current_time = env.ledger().timestamp();
+        let vested_amount = Self::calculate_vested_amount(&schedule, current_time)?;
+
+        if vested_amount == 0 {
+            return Err(VestingError::NotVested);
+        }
+
+        // Verify contract has sufficient balance
+        let balance = token_client.balance(&env.current_contract_address());
+
+        if balance < vested_amount {
+            return Err(VestingError::InsufficientBalance);
+        }
+
+        // Mark as claimed (atomic operation)
+        schedule.claimed = true;
+        schedules.set(request.grant_id, schedule.clone());
+
+        // Transfer tokens
+        token_client.transfer(
+            &env.current_contract_address(),
+            &request.beneficiary,
+            &vested_amount,
+        );
+
+        // Emit claim event
+        let claim_event = ClaimEvent {
+            grant_id: request.grant_id,
+            beneficiary: request.beneficiary.clone(),
+            amount: vested_amount,
+            claimed_at: env.ledger().timestamp(),
+        };
+
+        env.events().publish((symbol_short!("claim"),), claim_event);
+
+        Ok(vested_amount)
     }
 
     /// Claim vested tokens (atomic operation, single-claim semantics)

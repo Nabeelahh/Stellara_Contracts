@@ -28,6 +28,39 @@ pub struct Trade {
     pub is_buy: bool,
 }
 
+/// Batch trade request
+#[contracttype]
+#[derive(Clone, Debug)]
+pub struct BatchTradeRequest {
+    pub trader: Address,
+    pub pair: Symbol,
+    pub amount: i128,
+    pub price: i128,
+    pub is_buy: bool,
+    pub fee_token: Address,
+    pub fee_amount: i128,
+    pub fee_recipient: Address,
+}
+
+/// Batch trade result
+#[contracttype]
+#[derive(Clone, Debug)]
+pub struct BatchTradeResult {
+    pub trade_id: Option<u64>,
+    pub success: bool,
+    pub error_code: Option<u32>,
+}
+
+/// Batch trade operation result
+#[contracttype]
+#[derive(Clone, Debug, PartialEq)]
+pub struct BatchTradeOperation {
+    pub successful_trades: soroban_sdk::Vec<u64>,
+    pub failed_trades: soroban_sdk::Vec<BatchTradeResult>,
+    pub total_fees_collected: i128,
+    pub gas_saved: i128, // Estimated gas savings
+}
+
 /// Trading statistics
 #[contracttype]
 #[derive(Clone, Debug)]
@@ -44,6 +77,8 @@ pub enum TradeError {
     InvalidAmount = 3002,
     ContractPaused = 3003,
     NotInitialized = 3004,
+    BatchSizeExceeded = 3005,
+    BatchOperationFailed = 3006,
 }
 
 impl From<TradeError> for soroban_sdk::Error {
@@ -61,6 +96,15 @@ impl From<&TradeError> for soroban_sdk::Error {
 impl From<soroban_sdk::Error> for TradeError {
     fn from(_error: soroban_sdk::Error) -> Self {
         TradeError::Unauthorized
+    }
+}
+
+impl From<FeeError> for TradeError {
+    fn from(error: FeeError) -> Self {
+        match error {
+            FeeError::InsufficientBalance => TradeError::Unauthorized,
+            FeeError::InvalidAmount => TradeError::InvalidAmount,
+        }
     }
 }
 
@@ -208,6 +252,155 @@ impl UpgradeableTradingContract {
             is_buy,
             fee_amount,
             fee_token,
+            timestamp,
+        });
+
+        Ok(trade_id)
+    }
+
+    /// Execute multiple trades in a single transaction
+    pub fn batch_trade(
+        env: Env,
+        requests: soroban_sdk::Vec<BatchTradeRequest>,
+    ) -> Result<BatchTradeOperation, TradeError> {
+        // Maximum batch size to prevent resource exhaustion
+        const MAX_BATCH_SIZE: u32 = 50;
+        
+        if requests.len() > MAX_BATCH_SIZE {
+            return Err(TradeError::BatchSizeExceeded);
+        }
+
+        // Verify not paused
+        let paused_key = symbol_short!("pause");
+        let is_paused: bool = env
+            .storage()
+            .persistent()
+            .get(&paused_key)
+            .unwrap_or(false);
+
+        if is_paused {
+            return Err(TradeError::ContractPaused);
+        }
+
+        let mut successful_trades = soroban_sdk::Vec::new(&env);
+        let mut failed_trades = soroban_sdk::Vec::new(&env);
+        let mut total_fees_collected = 0i128;
+        let mut total_gas_saved = 0i128;
+
+        // Get current stats
+        let stats_key = symbol_short!("stats");
+        let mut stats: TradeStats = env
+            .storage()
+            .persistent()
+            .get(&stats_key)
+            .unwrap_or(TradeStats {
+                total_trades: 0,
+                total_volume: 0,
+                last_trade_id: 0,
+            });
+
+        // Process each trade request
+        for (index, request) in requests.iter().enumerate() {
+            // Authenticate the trader
+            request.trader.require_auth();
+
+            let result = match Self::process_single_trade(
+                &env,
+                &request,
+                &mut stats,
+                index as u32,
+            ) {
+                Ok(trade_id) => {
+                    successful_trades.push_back(trade_id);
+                    total_fees_collected += request.fee_amount;
+                    total_gas_saved += 1000i128; // Estimated gas savings per trade
+                    BatchTradeResult {
+                        trade_id: Some(trade_id),
+                        success: true,
+                        error_code: None,
+                    }
+                }
+                Err(error) => BatchTradeResult {
+                    trade_id: None,
+                    success: false,
+                    error_code: Some(error as u32),
+                },
+            };
+
+            failed_trades.push_back(result);
+        }
+
+        // Update stats in storage
+        env.storage().persistent().set(&stats_key, &stats);
+
+        Ok(BatchTradeOperation {
+            successful_trades,
+            failed_trades,
+            total_fees_collected,
+            gas_saved: total_gas_saved,
+        })
+    }
+
+    /// Process a single trade within a batch operation
+    fn process_single_trade(
+        env: &Env,
+        request: &BatchTradeRequest,
+        stats: &mut TradeStats,
+        _batch_index: u32,
+    ) -> Result<u64, TradeError> {
+        // Validate amount
+        if request.amount <= 0 {
+            return Err(TradeError::InvalidAmount);
+        }
+
+        // Collect fee first
+        FeeManager::collect_fee(
+            env,
+            &request.fee_token,
+            &request.trader,
+            &request.fee_recipient,
+            request.fee_amount,
+        )?;
+
+        // Create trade record
+        let trade_id = stats.last_trade_id + 1;
+        let timestamp = env.ledger().timestamp();
+        let trade = Trade {
+            id: trade_id,
+            trader: request.trader.clone(),
+            pair: request.pair.clone(),
+            amount: request.amount,
+            price: request.price,
+            timestamp,
+            is_buy: request.is_buy,
+        };
+
+        // Update stats
+        stats.total_trades += 1;
+        stats.total_volume += request.amount;
+        stats.last_trade_id = trade_id;
+
+        // Store trade
+        let trades_key = symbol_short!("trades");
+        let mut trades: soroban_sdk::Vec<Trade> = env
+            .storage()
+            .persistent()
+            .get(&trades_key)
+            .unwrap_or_else(|| soroban_sdk::Vec::new(env));
+
+        trades.push_back(trade);
+        env.storage().persistent().set(&trades_key, &trades);
+
+        // Emit trade executed event with batch index
+        EventEmitter::trade_executed(env, TradeExecutedEvent {
+            trade_id,
+            trader: request.trader.clone(),
+            pair: request.pair.clone(),
+            amount: request.amount,
+            price: request.price,
+            is_buy: request.is_buy,
+            fee_amount: request.fee_amount,
+            fee_token: request.fee_token.clone(),
             timestamp,
         });
 
