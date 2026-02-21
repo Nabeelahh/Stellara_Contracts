@@ -5,8 +5,8 @@ pub mod storage;
 #[cfg(test)]
 mod test;
 
-use soroban_sdk::{contract, contractimpl, Address, BytesN, Env, Vec, symbol_short, Symbol};
-use crate::types::{IdentityMetadata, Credential, CredentialType};
+use soroban_sdk::{contract, contractimpl, Address, BytesN, Env, Bytes, symbol_short};
+use crate::types::{IdentityMetadata, Credential, CredentialType, Error};
 use crate::storage::{get_admin, set_admin, has_admin, get_identity, set_identity, get_credential, set_credential, is_verifier, set_verifier};
 
 #[contract]
@@ -15,15 +15,16 @@ pub struct IdentityContract;
 #[contractimpl]
 impl IdentityContract {
     /// Initialize the contract with an admin address
-    pub fn initialize(env: Env, admin: Address) {
+    pub fn initialize(env: Env, admin: Address) -> Result<(), Error> {
         if has_admin(&env) {
-            panic!("Already initialized");
+            return Err(Error::AlreadyInitialized);
         }
         set_admin(&env, &admin);
+        Ok(())
     }
 
     /// Register or update an identity
-    pub fn register_identity(env: Env, user: Address, did_uri: Vec<u8>, public_key: BytesN<32>) {
+    pub fn register_identity(env: Env, user: Address, did_uri: Bytes, public_key: BytesN<32>) {
         user.require_auth();
         
         let now = env.ledger().timestamp();
@@ -66,15 +67,15 @@ impl IdentityContract {
         credential_type: CredentialType,
         claim_hash: BytesN<32>,
         expires_at: Option<u64>,
-    ) {
+    ) -> Result<(), Error> {
         issuer.require_auth();
         
         if !is_verifier(&env, &issuer) {
-            panic!("Not an authorized verifier");
+            return Err(Error::Unauthorized);
         }
         
         if get_credential(&env, &claim_hash).is_some() {
-            panic!("Credential already exists");
+            return Err(Error::AlreadyExists);
         }
         
         let credential = Credential {
@@ -82,7 +83,7 @@ impl IdentityContract {
             subject: subject.clone(),
             credential_type,
             claim_hash: claim_hash.clone(),
-            signature: BytesN::from_array(&env, &[0u8; 64]), // Simplified, can use real signatures
+            signature: Bytes::new(&env), // Corrected to use Bytes::new
             issued_at: env.ledger().timestamp(),
             expires_at,
             is_revoked: false,
@@ -95,6 +96,8 @@ impl IdentityContract {
             (symbol_short!("cred"), symbol_short!("issued"), subject),
             claim_hash,
         );
+
+        Ok(())
     }
 
     /// Verify a credential without revealing private data
@@ -102,7 +105,7 @@ impl IdentityContract {
     pub fn verify_credential(
         env: Env,
         claim_hash: BytesN<32>,
-        data: Vec<u8>,
+        data: Bytes,
         salt: BytesN<32>,
     ) -> bool {
         let credential = get_credential(&env, &claim_hash).expect("Credential not found");
@@ -118,8 +121,8 @@ impl IdentityContract {
         }
         
         // Verify hash: H(data || salt)
-        let mut bytes = soroban_sdk::Bytes::new(&env);
-        bytes.append(&data.into()); // Convert Vec<u8> to Bytes
+        let mut bytes = Bytes::new(&env);
+        bytes.append(&data); // data is already Bytes
         bytes.append(&salt.into()); // Convert BytesN<32> to Bytes
         
         let hash = env.crypto().sha256(&bytes);
@@ -130,11 +133,6 @@ impl IdentityContract {
     /// Revoke a credential (Issuer or Admin only)
     pub fn revoke_credential(env: Env, claim_hash: BytesN<32>) {
         let mut credential = get_credential(&env, &claim_hash).expect("Credential not found");
-        
-        let caller = env.invoker(); // Use env.sender() or require_auth
-        // In newer Soroban versions, we use Address and require_auth
-        // Since I don't know the exact caller easily without an argument, I'll pass it if needed.
-        // But better is to just require_auth on the issuer.
         
         credential.issuer.require_auth();
         

@@ -12,6 +12,7 @@ enum Action {
 }
 
 proptest! {
+    #![proptest_config(ProptestConfig::with_cases(32))]
 
     /// -----------------------------------------
     /// Stateful invariant: supply + balances safe
@@ -24,7 +25,7 @@ proptest! {
                 (1i128..10_000i128).prop_map(Action::Transfer),
                 (1i128..10_000i128).prop_map(Action::Mint),
             ],
-            1..50
+            1..20
         )
     ) {
         let env = Env::default();

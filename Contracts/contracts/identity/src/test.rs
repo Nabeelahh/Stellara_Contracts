@@ -1,7 +1,7 @@
 #![cfg(test)]
 
 use super::*;
-use soroban_sdk::{testutils::Address as _, Env, Vec, BytesN};
+use soroban_sdk::{testutils::Address as _, Env, BytesN, Bytes};
 use crate::types::CredentialType;
 
 #[test]
@@ -16,7 +16,7 @@ fn test_identity_registration() {
     client.initialize(&admin);
 
     let user = Address::generate(&env);
-    let did_uri = Vec::from_slice(&env, b"did:stellara:123");
+    let did_uri = Bytes::from_slice(&env, b"did:stellara:123");
     let public_key = BytesN::from_array(&env, &[1u8; 32]);
 
     client.register_identity(&user, &did_uri, &public_key);
@@ -41,12 +41,12 @@ fn test_credential_issuance_and_verification() {
     client.add_verifier(&issuer);
 
     let subject = Address::generate(&env);
-    let data = Vec::from_slice(&env, b"Graduated from Stellara Academy");
+    let data = Bytes::from_slice(&env, b"Graduated from Stellara Academy");
     let salt = BytesN::from_array(&env, &[9u8; 32]);
     
     // Pre-calculate hash
-    let mut bytes = soroban_sdk::Bytes::new(&env);
-    bytes.append(&data.clone().into());
+    let mut bytes = Bytes::new(&env);
+    bytes.append(&data);
     bytes.append(&salt.clone().into());
     let claim_hash = env.crypto().sha256(&bytes);
 
@@ -62,7 +62,6 @@ fn test_credential_issuance_and_verification() {
 }
 
 #[test]
-#[should_panic(expected = "Not an authorized verifier")]
 fn test_unauthorized_issuer() {
     let env = Env::default();
     env.mock_all_auths();
@@ -77,5 +76,7 @@ fn test_unauthorized_issuer() {
     let subject = Address::generate(&env);
     let claim_hash = BytesN::from_array(&env, &[0u8; 32]);
 
-    client.issue_credential(&unauthorized, &subject, &CredentialType::AcademyGraduation, &claim_hash, &None);
+    let res = client.try_issue_credential(&unauthorized, &subject, &CredentialType::AcademyGraduation, &claim_hash, &None);
+    
+    assert!(res.is_err());
 }

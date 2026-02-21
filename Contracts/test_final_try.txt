@@ -1,0 +1,93 @@
+cargo : warning: profiles 
+for the non root package 
+will be ignored, specify 
+profiles at the workspace 
+root:
+At line:1 char:1
++ cargo test -p 
+stellara-identity 2>&1 | 
+Out-File -FilePath 
+test_final_ ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~
+    + CategoryInfo          
+    : NotSpecified: (warni  
+  ng: profil...workspace    
+ root::String) [], Remot    
+eException
+    + FullyQualifiedErrorId 
+    : NativeCommandError
+ 
+package:   C:\Users\HP\Deskt
+op\Stellara_Contracts\Contra
+cts\contracts\token\Cargo.to
+ml
+workspace: C:\Users\HP\Deskt
+op\Stellara_Contracts\Contra
+cts\Cargo.toml
+warning: profiles for the 
+non root package will be 
+ignored, specify profiles 
+at the workspace root:
+package:   C:\Users\HP\Deskt
+op\Stellara_Contracts\Contra
+cts\contracts\academy\Cargo.
+toml
+workspace: C:\Users\HP\Deskt
+op\Stellara_Contracts\Contra
+cts\Cargo.toml
+warning: profiles for the 
+non root package will be 
+ignored, specify profiles 
+at the workspace root:
+package:   C:\Users\HP\Deskt
+op\Stellara_Contracts\Contra
+cts\contracts\privacy_token\
+Cargo.toml
+workspace: C:\Users\HP\Deskt
+op\Stellara_Contracts\Contra
+cts\Cargo.toml
+warning: profiles for the 
+non root package will be 
+ignored, specify profiles 
+at the workspace root:
+package:   C:\Users\HP\Deskt
+op\Stellara_Contracts\Contra
+cts\contracts\privacy_tradin
+g\Cargo.toml
+workspace: C:\Users\HP\Deskt
+op\Stellara_Contracts\Contra
+cts\Cargo.toml
+   Compiling 
+stellara-identity v0.1.0 (C:
+\Users\HP\Desktop\Stellara_C
+ontracts\Contracts\contracts
+\identity)
+    Finished `test` profile 
+[unoptimized + debuginfo] 
+target(s) in 7.31s
+     Running unittests 
+src\lib.rs (target\debug\dep
+s\stellara_identity-424b5f36
+140a945d.exe)
+
+running 3 tests
+thread caused non-unwinding 
+panic. aborting.
+error: test failed, to 
+rerun pass `-p 
+stellara-identity --lib`
+
+Caused by:
+  process didn't exit 
+successfully: `C:\Users\HP\D
+esktop\Stellara_Contracts\Co
+ntracts\target\debug\deps\st
+ellara_identity-424b5f36140a
+945d.exe` (exit code: 
+0xc0000409, 
+STATUS_STACK_BUFFER_OVERRUN)
+note: test exited 
+abnormally; to see the full 
+output pass --no-capture to 
+the harness.
