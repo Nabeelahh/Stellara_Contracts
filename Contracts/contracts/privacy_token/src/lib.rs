@@ -619,13 +619,13 @@ mod tests {
 
         client.initialize(
             &admin,
-            &Symbol::new(&env, "Private Token"),
+            &Symbol::new(&env, "PrivateToken"),
             &Symbol::new(&env, "PRIV"),
             &18,
         );
 
         let metadata = client.metadata();
-        assert_eq!(metadata.name, Symbol::new(&env, "Private Token"));
+        assert_eq!(metadata.name, Symbol::new(&env, "PrivateToken"));
         assert_eq!(metadata.symbol, Symbol::new(&env, "PRIV"));
         assert_eq!(metadata.decimals, 18);
     }
@@ -637,7 +637,7 @@ mod tests {
 
         client.initialize(
             &admin,
-            &Symbol::new(&env, "Private Token"),
+            &Symbol::new(&env, "PrivateToken"),
             &Symbol::new(&env, "PRIV"),
             &18,
         );
@@ -656,7 +656,7 @@ mod tests {
 
         client.initialize(
             &admin,
-            &Symbol::new(&env, "Private Token"),
+            &Symbol::new(&env, "PrivateToken"),
             &Symbol::new(&env, "PRIV"),
             &18,
         );
@@ -675,7 +675,7 @@ mod tests {
 
         client.initialize(
             &admin,
-            &Symbol::new(&env, "Private Token"),
+            &Symbol::new(&env, "PrivateToken"),
             &Symbol::new(&env, "PRIV"),
             &18,
         );
@@ -714,7 +714,7 @@ mod tests {
 
         client.initialize(
             &admin,
-            &Symbol::new(&env, "Private Token"),
+            &Symbol::new(&env, "PrivateToken"),
             &Symbol::new(&env, "PRIV"),
             &18,
         );
@@ -741,7 +741,7 @@ mod tests {
 
         client.initialize(
             &admin,
-            &Symbol::new(&env, "Private Token"),
+            &Symbol::new(&env, "PrivateToken"),
             &Symbol::new(&env, "PRIV"),
             &18,
         );
