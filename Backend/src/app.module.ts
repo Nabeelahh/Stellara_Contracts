@@ -41,6 +41,7 @@ import { TenantUsage } from './tenancy/entities/tenant-usage.entity';
 import { TenantInvitation } from './tenancy/entities/tenant-invitation.entity';
 import { ApiVersioningModule } from './api-versioning/api-versioning.module';
 import { VersionMiddleware } from './api-versioning/version.middleware';
+import { HealthModule } from './health/health.module';
 
 @Module({
   imports: [
@@ -106,6 +107,7 @@ import { VersionMiddleware } from './api-versioning/version.middleware';
     ThrottleModule,
     TenantModule,
     ApiVersioningModule,
+    HealthModule,
   ],
 
   controllers: [AppController],
