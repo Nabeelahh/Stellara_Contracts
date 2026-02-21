@@ -7,6 +7,7 @@ members = [
     "contracts/academy-rewards",
     "contracts/privacy_token",
     "contracts/privacy_trading",
+    "contracts/identity",
     # "contracts/staking",         # TODO: Fix compilation errors
     # "contracts/yield_farming",   # TODO: Fix compilation errors
     # "contracts/reward_distributor", # TODO: Fix compilation errors
