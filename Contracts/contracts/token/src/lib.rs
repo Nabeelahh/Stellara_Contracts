@@ -170,7 +170,7 @@ impl TokenContract {
     pub fn state_commitment(env: Env, _key: Symbol, _subject: Val) -> BytesN<32> {
         // Simplified implementation for testing - returns a dummy commitment
         // In a real implementation, this would compute a proper state commitment
-        env.crypto().sha256(&Bytes::from_slice(&env, b"dummy_commitment"))
+        env.crypto().sha256(&Bytes::from_slice(&env, b"dummy_commitment")).into()
     }
 
     pub fn get_balance_proof(env: Env, _id: Address) -> BytesN<32> {

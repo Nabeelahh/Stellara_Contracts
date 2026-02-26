@@ -1,6 +1,5 @@
-use soroban_sdk::{contracttype, symbol_short, Address, Bytes, BytesN, Env, IntoVal, Map, Symbol, Val, Vec};
+use soroban_sdk::{symbol_short, Address, Bytes, BytesN, Env, Map, Symbol, Val};
 
-#[contracttype]
 #[derive(Clone)]
 pub struct StateProof {
     pub contract: Address,
@@ -35,7 +34,7 @@ fn compute_payload(_env: &Env, contract: &Address, key: &Symbol, _subject: &Val,
 
 pub fn compute_commitment(env: &Env, contract: &Address, key: &Symbol, subject: &Val, ledger: u32) -> BytesN<32> {
     let payload = compute_payload(env, contract, key, subject, ledger);
-    env.crypto().sha256(&payload)
+    env.crypto().sha256(&payload).into()
 }
 
 fn trust_key() -> Symbol {
