@@ -48,6 +48,7 @@ model User {
   notifications        Notification[]
   proposals            TransactionProposal[]
   tenantMembers       TenantMember[]
+  experimentAssignments ExperimentAssignment[]
 
   @@unique([tenantId, email])
   @@unique([tenantId, walletAddress])
@@ -671,6 +672,74 @@ model FeatureFlag {
   @@index([key])
   @@index([tenantId])
   @@map("feature_flags")
+}
+
+model Experiment {
+  id              String      @id @default(uuid())
+  name            String
+  description     String?
+  key             String      @unique
+  status          ExperimentStatus @default(DRAFT)
+  trafficCoverage Int         @default(100) @map("traffic_coverage")
+  controlSize     Int         @default(50) @map("control_size")
+  startDate       DateTime?   @map("start_date")
+  endDate         DateTime?   @map("end_date")
+  metricName      String      @map("metric_name")
+  metadata        Json?
+  tenantId        String?     @map("tenant_id")
+  createdAt       DateTime    @default(now()) @map("created_at")
+  updatedAt       DateTime    @updatedAt @map("updated_at")
+
+  assignments     ExperimentAssignment[]
+  events          ExperimentEvent[]
+
+  @@index([key])
+  @@index([tenantId])
+  @@map("experiments")
+}
+
+enum ExperimentStatus {
+  DRAFT
+  ACTIVE
+  PAUSED
+  COMPLETED
+  ARCHIVED
+}
+
+model ExperimentAssignment {
+  id           String     @id @default(uuid())
+  experimentId String     @map("experiment_id")
+  userId       String     @map("user_id")
+  variant      ExperimentVariant
+  assignedAt   DateTime   @default(now()) @map("assigned_at")
+
+  experiment   Experiment @relation(fields: [experimentId], references: [id], onDelete: Cascade)
+  user         User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([experimentId, userId])
+  @@index([userId])
+  @@map("experiment_assignments")
+}
+
+enum ExperimentVariant {
+  CONTROL
+  TREATMENT
+}
+
+model ExperimentEvent {
+  id           String   @id @default(uuid())
+  experimentId String   @map("experiment_id")
+  userId       String   @map("user_id")
+  eventName    String   @map("event_name")
+  value        Float?   @default(1.0)
+  metadata     Json?
+  timestamp    DateTime @default(now())
+
+  experiment   Experiment @relation(fields: [experimentId], references: [id], onDelete: Cascade)
+
+  @@index([experimentId, eventName])
+  @@index([userId])
+  @@map("experiment_events")
 }
 
 model ConfigAuditLog {

@@ -1,4 +1,5 @@
 import { AbiRegistryModule } from './abi-registry/abi-registry.module';
+import { ExperimentsModule } from './experiments/experiments.module';
 import { AnalyticsModule } from './analytics/analytics.module';
 
 import { AdminModule } from './admin/admin.module';
@@ -88,6 +89,7 @@ import { MultisigModule } from './multisig/multisig.module';
     SupportModule,
     MultisigModule,
     AnalyticsModule,
+    ExperimentsModule,
   ],
   controllers: [AppController, UserController, DocsController],
   providers: [AppService],
