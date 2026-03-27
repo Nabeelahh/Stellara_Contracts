@@ -619,6 +619,7 @@ impl UpgradeableMessagingContract {
         Ok(ACL::has_permission(&env, &user, &permission))
     }
 
+    #[allow(dead_code)]
     fn require_admin_role(env: &Env, admin: &Address) -> Result<(), MessagingError> {
         let roles: Map<Address, GovernanceRole> = env
             .storage()

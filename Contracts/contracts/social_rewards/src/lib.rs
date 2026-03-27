@@ -52,6 +52,18 @@ impl From<RewardError> for soroban_sdk::Error {
     }
 }
 
+impl From<&RewardError> for soroban_sdk::Error {
+    fn from(error: &RewardError) -> Self {
+        soroban_sdk::Error::from_contract_error(*error as u32)
+    }
+}
+
+impl From<soroban_sdk::Error> for RewardError {
+    fn from(_error: soroban_sdk::Error) -> Self {
+        RewardError::Unauthorized
+    }
+}
+
 #[contractimpl]
 impl SocialRewardsContract {
     /// Initialize the social rewards contract
@@ -99,7 +111,7 @@ impl SocialRewardsContract {
         let engagement = Engagement {
             id: next_id,
             user: user.clone(),
-            engagement_type,
+            engagement_type: engagement_type.clone(),
             timestamp: current_timestamp,
             metadata,
         };
@@ -190,9 +202,11 @@ impl SocialRewardsContract {
             return Err(RewardError::NotInitialized);
         }
 
+        // Create reward symbol before moving env
+        let reward_type = Symbol::new(&env, "reward");
+
         // Record engagement as generic reward activity
-        let _engagement_id =
-            Self::record_engagement(env, user, Symbol::new(&env, "reward"), amount)?;
+        let _engagement_id = Self::record_engagement(env, user, reward_type, amount)?;
 
         Ok(())
     }
