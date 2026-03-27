@@ -45,6 +45,7 @@ import { GraphqlModule } from './graphql/graphql.module';
 import { ObjectStorageModule } from './object-storage/object-storage.module';
 import { ZkModule } from './zk/zk.module';
 import { FailoverModule } from './failover/failover.module';
+import { IdentityModule } from './identity/identity.module';
 import { CostMonitoringModule } from './cost-monitoring/cost-monitoring.module';
 import { CircuitBreakerModule } from './circuit-breaker/circuit-breaker.module';
 import { DataRetentionModule } from './data-retention/data-retention.module';
@@ -119,6 +120,7 @@ import { TransactionQueueModule } from './transaction-queue/transaction-queue.mo
     GraphqlModule,
     ObjectStorageModule,
     ZkModule,
+    IdentityModule,
     FailoverModule,
     CostMonitoringModule,
     DataResidencyModule,
@@ -128,4 +130,4 @@ import { TransactionQueueModule } from './transaction-queue/transaction-queue.mo
   controllers: [AppController, UserController, DocsController],
   providers: [AppService],
 })
-export class AppModule { }
+export class AppModule {}

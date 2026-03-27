@@ -1,4 +1,19 @@
-📜 Stellara AI Smart Contracts (Soroban)
+Contracts: SBT and Revocation
+
+This folder contains example Solidity contracts and Circom circuits for the SBT identity feature.
+
+Files added:
+
+- `contracts/SoulboundCredential.sol` — minimal non-transferable ERC-721 SBT implementation with issue/revoke/renew + expiration.
+- `contracts/RevocationRegistry.sol` — simple on-chain revocation registry.
+- `circuits/age_over_18.circom` — illustrative Circom circuit for proving age >= 18.
+- `circuits/accredited_investor.circom` — illustrative circuit for an accredited investor boolean claim.
+
+Deployment and testing
+
+- Use `hardhat` or `foundry` to compile and deploy the Solidity contracts. Install `@openzeppelin/contracts`.
+- For circuits, compile with `circom` and use `snarkjs` for trusted setup and proof generation.
+  📜 Stellara AI Smart Contracts (Soroban)
 
 Soroban smart contracts powering Stellara AI, a Web3 crypto learning and social trading platform built on the Stellar blockchain. These contracts provide decentralized services for education credentials, social rewards, messaging, and on-chain trading used by the Stellara backend and frontend applications.
 
@@ -12,9 +27,10 @@ This repository is intended for blockchain developers, protocol contributors, an
 ✅ **Timelock Delays**: Prevents immediate execution (configurable: 1-24+ hours)  
 ✅ **Role-Based Control**: Admin, Approver, and Executor roles prevent single points of failure  
 ✅ **Transparent Governance**: All proposals tracked on-chain and auditable  
-✅ **Comprehensive Tests**: 10+ test cases covering all upgrade scenarios  
+✅ **Comprehensive Tests**: 10+ test cases covering all upgrade scenarios
 
 **Documentation**:
+
 - [Upgradeability Design](./UPGRADEABILITY.md) - Complete architecture & security analysis
 - [Governance User Guide](./GOVERNANCE_GUIDE.md) - Step-by-step upgrade procedures
 - [Quick Reference](./QUICK_REFERENCE.md) - 30-second overview
@@ -123,14 +139,12 @@ stellar contract invoke --id $CONTRACT_ID --source $EXECUTOR -- \
   - Complete governance process flow
   - Smart contract implementation details
   - Testing & validation strategy
-  
 - **[GOVERNANCE_GUIDE.md](./GOVERNANCE_GUIDE.md)**: Practical guide with:
   - Step-by-step CLI examples
   - Multi-signature approval workflow
   - Timelock management
   - Error handling & troubleshooting
   - Emergency procedures
-  
 - **[QUICK_REFERENCE.md](./QUICK_REFERENCE.md)**: Cheat sheet with:
   - 30-second overview
   - Function reference
@@ -142,17 +156,20 @@ stellar contract invoke --id $CONTRACT_ID --source $EXECUTOR -- \
 ### Testnet Deployment
 
 1. Set up your Stellar CLI:
+
 ```bash
 stellar config network set testnet https://soroban-testnet.stellar.org
 ```
 
 2. Create a network configuration:
+
 ```bash
 stellar config set --scope global RPC_URL https://soroban-testnet.stellar.org
 stellar config set --scope global NETWORK_PASSPHRASE "Test SDF Network ; September 2015"
 ```
 
 3. Deploy contracts:
+
 ```bash
 # Build WASM binaries
 cargo build --release --target wasm32-unknown-unknown
@@ -165,6 +182,7 @@ stellar contract deploy \
 ```
 
 4. Initialize contracts after deployment:
+
 ```bash
 # Initialize trading contract with governance
 stellar contract invoke \
@@ -184,6 +202,7 @@ stellar contract invoke \
 Manages decentralized trading operations with governance support.
 
 **Key Functions:**
+
 - `init()`: Initialize with governance roles
 - `trade()`: Execute a trade on specified pair with fee collection
 - `get_stats()`: Retrieve trading statistics
@@ -193,6 +212,7 @@ Manages decentralized trading operations with governance support.
 - `pause()` / `unpause()`: Emergency pause functionality
 
 **Governance Functions:**
+
 - `propose_upgrade()`: Create upgrade proposal (Admin)
 - `approve_upgrade()`: Approve proposal (Approver)
 - `reject_upgrade()`: Reject proposal (Approver)
@@ -218,6 +238,7 @@ Manages educational credentials, achievements, and secure vesting of academy rew
    - `verify_credential()`: Verify a credential exists
 
 **Vesting Features:**
+
 - ✅ Time-based vesting with cliff periods
 - ✅ Linear vesting after cliff
 - ✅ Single-claim semantics (prevents double-spend)
@@ -226,6 +247,7 @@ Manages educational credentials, achievements, and secure vesting of academy rew
 - ✅ 18+ comprehensive tests
 
 **Documentation:**
+
 - [VESTING_DESIGN.md](./contracts/academy/VESTING_DESIGN.md) - Complete technical design
 - [VESTING_QUICK_REFERENCE.md](./contracts/academy/VESTING_QUICK_REFERENCE.md) - Quick start
 - [INTEGRATION_GUIDE.md](./contracts/academy/INTEGRATION_GUIDE.md) - Integration examples
@@ -236,6 +258,7 @@ Manages educational credentials, achievements, and secure vesting of academy rew
 Tracks engagement and distributes rewards.
 
 **Key Functions:**
+
 - `init()`: Initialize the contract
 - `record_engagement()`: Record user engagement activity
 - `get_user_rewards()`: Get user's reward balance and tier
@@ -247,6 +270,7 @@ Tracks engagement and distributes rewards.
 Enables decentralized P2P messaging.
 
 **Key Functions:**
+
 - `init()`: Initialize the contract
 - `send_message()`: Send message to recipient
 - `mark_as_read()`: Mark message as read
@@ -287,11 +311,12 @@ export EXECUTOR_ADDRESS="G..."
 
 🌐 **Frontend** (Next.js): https://github.com/Dev-shamoo/Stellara_Ai  
 ⚙ **Backend** (NestJS): https://github.com/shamoo53/Stellara_Ai_backend  
-⭐ **Stellar Docs**: https://developers.stellar.org/docs/smart-contracts/soroban/  
+⭐ **Stellar Docs**: https://developers.stellar.org/docs/smart-contracts/soroban/
 
 ## Contributing
 
 🤝 Contributing:
+
 - Fork the repository
 - Create a feature branch
 - Submit a pull request
@@ -305,7 +330,7 @@ Please ensure all tests pass and documentation is updated with your changes.
 **Status**: Production Ready
 Commit your changes
 git pull latest changes to avoid conflicts
-Submit a pull request 
+Submit a pull request
 Issues and feature requests are welcome.
 
 When adding new features:
@@ -314,7 +339,3 @@ When adding new features:
 2. Add corresponding tests
 3. Update this README with new function documentation
 4. Ensure all tests pass before submitting
-
-
-
-

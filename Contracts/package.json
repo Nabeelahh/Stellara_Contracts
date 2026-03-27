@@ -1,4 +1,17 @@
 {
+  "name": "contracts",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "compile": "hardhat compile"
+  },
+  "devDependencies": {
+    "hardhat": "^2.16.0",
+    "@nomicfoundation/hardhat-toolbox": "^3.0.0",
+    "@openzeppelin/contracts": "^4.9.0"
+  }
+}
+{
   "name": "my-v0-project",
   "version": "0.1.0",
   "private": true,
