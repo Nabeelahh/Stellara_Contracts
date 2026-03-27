@@ -1372,3 +1372,108 @@ enum DocumentType {
   DRIVERS_LICENSE
   NATIONAL_ID
 }
+
+// ─── Behavioral Analytics Models ──────────────────────────────────────────────
+
+model AnalyticsEvent {
+  id          String   @id @default(cuid())
+  userId      String?  @map("user_id")
+  sessionId   String?  @map("session_id")
+  eventType   String   @map("event_type")
+  eventName   String   @map("event_name")
+  properties  Json?
+  page        String?
+  anonymized  Boolean  @default(false)
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  @@index([userId])
+  @@index([eventType])
+  @@index([eventName])
+  @@index([createdAt])
+  @@map("analytics_events")
+}
+
+model AnalyticsOptOut {
+  id         String   @id @default(cuid())
+  userId     String   @unique @map("user_id")
+  optedOutAt DateTime @default(now()) @map("opted_out_at")
+
+  @@map("analytics_opt_outs")
+}
+
+// ─── Token Vesting Models ──────────────────────────────────────────────────────
+
+model VestingSchedule {
+  id                 String    @id @default(cuid())
+  recipientAddress   String    @map("recipient_address")
+  totalAmount        Decimal   @db.Decimal(18, 4) @map("total_amount")
+  vestedAmount       Decimal   @default(0) @db.Decimal(18, 4) @map("vested_amount")
+  scheduleType       String    @map("schedule_type")
+  cliffMonths        Int       @map("cliff_months")
+  startDate          DateTime  @map("start_date")
+  endDate            DateTime  @map("end_date")
+  status             String    @default("active")
+  terminationDate    DateTime? @map("termination_date")
+  terminationReason  String?   @map("termination_reason")
+  accelerationReason String?   @map("acceleration_reason")
+  acceleratedAt      DateTime? @map("accelerated_at")
+  createdAt          DateTime  @default(now()) @map("created_at")
+  updatedAt          DateTime  @updatedAt @map("updated_at")
+
+  milestones VestingMilestone[]
+  events     VestingEvent[]
+
+  @@index([recipientAddress])
+  @@index([status])
+  @@map("vesting_schedules")
+}
+
+model VestingMilestone {
+  id            String          @id @default(cuid())
+  scheduleId    String          @map("schedule_id")
+  schedule      VestingSchedule @relation(fields: [scheduleId], references: [id], onDelete: Cascade)
+  milestoneDate DateTime        @map("milestone_date")
+  percentage    Decimal         @db.Decimal(5, 4)
+  description   String?
+  achieved      Boolean         @default(false)
+  achievedAt    DateTime?       @map("achieved_at")
+
+  @@index([scheduleId])
+  @@map("vesting_milestones")
+}
+
+model VestingEvent {
+  id              String          @id @default(cuid())
+  scheduleId      String          @map("schedule_id")
+  schedule        VestingSchedule @relation(fields: [scheduleId], references: [id], onDelete: Cascade)
+  eventType       String          @map("event_type")
+  amount          Decimal         @db.Decimal(18, 4)
+  tokenPrice      Decimal?        @db.Decimal(18, 4) @map("token_price")
+  taxableIncome   Decimal?        @db.Decimal(18, 4) @map("taxable_income")
+  transactionHash String?         @map("transaction_hash")
+  createdAt       DateTime        @default(now()) @map("created_at")
+
+  @@index([scheduleId])
+  @@index([eventType])
+  @@index([createdAt])
+  @@map("vesting_events")
+}
+
+// ─── Synthetic Monitoring Models ──────────────────────────────────────────────
+
+model SyntheticTestResult {
+  id           String   @id @default(cuid())
+  testName     String   @map("test_name")
+  location     String
+  durationMs   Int      @map("duration_ms")
+  success      Boolean
+  errorMessage String?  @map("error_message")
+  statusCode   Int?     @map("status_code")
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  @@index([testName])
+  @@index([location])
+  @@index([createdAt])
+  @@index([success])
+  @@map("synthetic_test_results")
+}

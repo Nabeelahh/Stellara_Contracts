@@ -91,7 +91,12 @@
     "typeorm": "^0.3.28",
     "ua-parser-js": "^2.0.9",
     "uuid": "^10.0.0",
-    "web-push": "^3.6.7"
+    "web-push": "^3.6.7",
+    "@nestjs/graphql": "^12.2.0",
+    "@apollo/server": "^4.11.0",
+    "@as-integrations/express": "^1.0.1",
+    "graphql": "^16.9.0",
+    "dataloader": "^2.2.3"
   },
   "devDependencies": {
     "@nestjs/cli": "^10.0.0",

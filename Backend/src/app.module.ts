@@ -38,6 +38,9 @@ import { validateEnv } from './config/env.validation';
 
 import { SupportModule } from './support/support.module';
 import { MultisigModule } from './multisig/multisig.module';
+import { VestingModule } from './vesting/vesting.module';
+import { MonitoringModule } from './monitoring/monitoring.module';
+import { GraphqlModule } from './graphql/graphql.module';
 
 @Module({
   imports: [
@@ -96,6 +99,9 @@ import { MultisigModule } from './multisig/multisig.module';
     KycModule,
     CollateralModule,
     GeolocationModule,
+    VestingModule,
+    MonitoringModule,
+    GraphqlModule,
   ],
   controllers: [AppController, UserController, DocsController],
   providers: [AppService],
