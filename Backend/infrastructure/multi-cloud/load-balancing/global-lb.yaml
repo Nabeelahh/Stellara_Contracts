@@ -1,0 +1,134 @@
+# Global Load Balancer Configuration
+# DNS-based load balancing with health checks and failover
+
+# AWS Route 53 Configuration
+# Primary: us-east-1 (AWS)
+# Secondary: uksouth (Azure)
+# Tertiary: us-central1 (GCP)
+
+# Route 53 Health Checks
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: route53-health-checks
+  namespace: stellara-backend
+data:
+  health-check-config.json: |
+    {
+      "healthChecks": [
+        {
+          "name": "stellara-backend-aws-primary",
+          "type": "HTTP",
+          "resourcePath": "/api/v1/health",
+          "fullyQualifiedDomainName": "api-aws.stellara.internal",
+          "port": 80,
+          "requestInterval": 30,
+          "failureThreshold": 2,
+          "regions": ["us-east-1"]
+        },
+        {
+          "name": "stellara-backend-azure-secondary",
+          "type": "HTTP",
+          "resourcePath": "/api/v1/health",
+          "fullyQualifiedDomainName": "api-azure.stellara.internal",
+          "port": 80,
+          "requestInterval": 30,
+          "failureThreshold": 2,
+          "regions": ["eu-west-2"]
+        },
+        {
+          "name": "stellara-backend-gcp-tertiary",
+          "type": "HTTP",
+          "resourcePath": "/api/v1/health",
+          "fullyQualifiedDomainName": "api-gcp.stellara.internal",
+          "port": 80,
+          "requestInterval": 30,
+          "failureThreshold": 2,
+          "regions": ["us-central1"]
+        }
+      ]
+    }
+
+---
+# Route 53 Failover Routing Policy
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: route53-failover-config
+  namespace: stellara-backend
+data:
+  failover-routing.json: |
+    {
+      "hostedZoneId": "Z1234567890ABC",
+      "records": [
+        {
+          "name": "api.stellara.io",
+          "type": "A",
+          "setIdentifier": "primary-aws",
+          "weight": 100,
+          "healthCheckId": "health-check-id-aws",
+          "aliasTarget": {
+            "dnsName": "stellara-backend-alb-123456789.us-east-1.elb.amazonaws.com",
+            "hostedZoneId": "Z1234567890ABC",
+            "evaluateTargetHealth": true
+          },
+          "failover": "PRIMARY"
+        },
+        {
+          "name": "api.stellara.io",
+          "type": "A",
+          "setIdentifier": "secondary-azure",
+          "weight": 0,
+          "healthCheckId": "health-check-id-azure",
+          "aliasTarget": {
+            "dnsName": "stellara-backend-agw.uksouth.cloudapp.azure.com",
+            "hostedZoneId": "Z1234567890ABC",
+            "evaluateTargetHealth": true
+          },
+          "failover": "SECONDARY"
+        },
+        {
+          "name": "api.stellara.io",
+          "type": "A",
+          "setIdentifier": "tertiary-gcp",
+          "weight": 0,
+          "healthCheckId": "health-check-id-gcp",
+          "aliasTarget": {
+            "dnsName": "stellara-backend-gclb.us-central1.lb.googleapis.com",
+            "hostedZoneId": "Z1234567890ABC",
+            "evaluateTargetHealth": true
+          },
+          "failover": "SECONDARY"
+        }
+      ]
+    }
+
+---
+# Global Load Balancer Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: stellara-global-lb
+  namespace: stellara-backend
+  annotations:
+    # External DNS annotation for automatic DNS management
+    external-dns.alpha.kubernetes.io/hostname: api.stellara.io
+    # Cloud-specific load balancer annotations
+    service.beta.kubernetes.io/aws-load-balancer-type: "nlb"
+    service.beta.kubernetes.io/aws-load-balancer-cross-zone-load-balancing-enabled: "true"
+    service.beta.kubernetes.io/aws-load-balancer-healthcheck-path: "/api/v1/health"
+    service.beta.kubernetes.io/aws-load-balancer-healthcheck-port: "80"
+    service.beta.kubernetes.io/aws-load-balancer-healthcheck-protocol: "HTTP"
+spec:
+  type: LoadBalancer
+  ports:
+  - port: 80
+    targetPort: 3000
+    protocol: TCP
+    name: http
+  - port: 443
+    targetPort: 3000
+    protocol: TCP
+    name: https
+  selector:
+    app.kubernetes.io/name: stellara-backend

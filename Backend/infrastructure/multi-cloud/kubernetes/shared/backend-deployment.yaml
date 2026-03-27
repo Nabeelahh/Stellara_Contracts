@@ -1,0 +1,104 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: stellara-backend
+  namespace: stellara-backend
+  labels:
+    app.kubernetes.io/name: stellara-backend
+    app.kubernetes.io/component: api
+    app.kubernetes.io/part-of: stellara
+spec:
+  replicas: 3  # Multi-zone deployment
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: stellara-backend
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: stellara-backend
+        app.kubernetes.io/component: api
+    spec:
+      containers:
+      - name: stellara-backend
+        image: stellara/backend:latest  # Replace with actual image
+        ports:
+        - containerPort: 3000
+          name: http
+        envFrom:
+        - configMapRef:
+            name: stellara-backend-config
+        env:
+        - name: DATABASE_HOST
+          value: "stellara-postgres"
+        - name: DATABASE_USER
+          valueFrom:
+            secretKeyRef:
+              name: stellara-backend-secrets
+              key: DATABASE_USER
+        - name: DATABASE_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: stellara-backend-secrets
+              key: DATABASE_PASSWORD
+        - name: DATABASE_NAME
+          value: "stellara_db"
+        - name: REDIS_HOST
+          value: "stellara-redis"
+        - name: REDIS_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: stellara-backend-secrets
+              key: REDIS_PASSWORD
+        - name: RABBITMQ_HOST
+          value: "stellara-rabbitmq"
+        - name: RABBITMQ_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: stellara-backend-secrets
+              key: RABBITMQ_PASSWORD
+        - name: JWT_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: stellara-backend-secrets
+              key: JWT_SECRET
+        - name: STELLAR_RPC_URL
+          valueFrom:
+            secretKeyRef:
+              name: stellara-backend-secrets
+              key: STELLAR_RPC_URL
+        - name: PROJECT_LAUNCH_CONTRACT_ID
+          valueFrom:
+            secretKeyRef:
+              name: stellara-backend-secrets
+              key: PROJECT_LAUNCH_CONTRACT_ID
+        - name: ESCROW_CONTRACT_ID
+          valueFrom:
+            secretKeyRef:
+              name: stellara-backend-secrets
+              key: ESCROW_CONTRACT_ID
+        resources:
+          requests:
+            memory: "512Mi"
+            cpu: "250m"
+          limits:
+            memory: "1Gi"
+            cpu: "500m"
+        livenessProbe:
+          httpGet:
+            path: /api/v1/health
+            port: 3000
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /api/v1/health
+            port: 3000
+          initialDelaySeconds: 5
+          periodSeconds: 5
+        startupProbe:
+          httpGet:
+            path: /api/v1/health
+            port: 3000
+          initialDelaySeconds: 10
+          periodSeconds: 10
+          failureThreshold: 30

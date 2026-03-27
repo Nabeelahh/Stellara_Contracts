@@ -1,0 +1,17 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: stellara-backend
+  namespace: stellara-backend
+  labels:
+    app.kubernetes.io/name: stellara-backend
+    app.kubernetes.io/component: api
+    app.kubernetes.io/part-of: stellara
+spec:
+  selector:
+    app.kubernetes.io/name: stellara-backend
+  ports:
+  - port: 80
+    targetPort: 3000
+    name: http
+  type: ClusterIP  # Will be exposed via Ingress
