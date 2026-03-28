@@ -5,6 +5,8 @@ import { ComplianceService } from './services/compliance.service';
 import { SanctionsScreeningService } from './services/sanctions-screening.service';
 import { TravelRuleService } from './services/travel-rule.service';
 import { CurrencyControlService } from './services/currency-control.service';
+import { MarketSurveillanceService } from './services/market-surveillance.service';
+import { PrismaModule } from '../prisma.module';
 
 @Module({
   imports: [
@@ -16,6 +18,7 @@ import { CurrencyControlService } from './services/currency-control.service';
       'ctr_reports',
       'currency_control_limits',
     ]),
+    PrismaModule,
   ],
   controllers: [ComplianceController],
   providers: [
@@ -23,12 +26,14 @@ import { CurrencyControlService } from './services/currency-control.service';
     SanctionsScreeningService,
     TravelRuleService,
     CurrencyControlService,
+    MarketSurveillanceService,
   ],
   exports: [
     ComplianceService,
     SanctionsScreeningService,
     TravelRuleService,
     CurrencyControlService,
+    MarketSurveillanceService,
   ],
 })
 export class ComplianceModule {}

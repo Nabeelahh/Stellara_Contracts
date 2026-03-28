@@ -140,5 +140,27 @@ export class TransactionGatewayService {
       throw new Error('Blockchain gateway fee bumping is not configured');
     });
   }
+
+  async simulateTransaction(input: {
+    signerAddress: string;
+    contractAddress: string;
+    functionName: string;
+    payload: Record<string, unknown>;
+  }): Promise<{ status: 'SUCCESS' | 'FAILED'; computeUnits: number; error?: string }> {
+    return this.circuitBreakerService.execute('stellar-rpc', async () => {
+      if (this.simulationMode) {
+        // Mock simulation success with random CU usage
+        return {
+          status: 'SUCCESS',
+          computeUnits: Math.floor(Math.random() * 50000) + 10000,
+        };
+      }
+      return {
+        status: 'FAILED',
+        computeUnits: 0,
+        error: 'Simulation not available in live mode yet',
+      };
+    });
+  }
 }
 

@@ -50,6 +50,7 @@ model User {
   tenantMembers       TenantMember[]
   experimentAssignments ExperimentAssignment[]
   verificationSessions VerificationSession[]
+  crossChainSwaps      CrossChainSwap[]
 
 
   @@unique([tenantId, email])
