@@ -23,4 +23,3 @@ export class EventBusService {
     return eventId;
   }
 }
-

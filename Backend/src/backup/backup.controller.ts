@@ -22,9 +22,7 @@ import { Observable } from 'rxjs';
 
 @Injectable()
 class AdminGuard implements CanActivate {
-  canActivate(
-    context: ExecutionContext,
-  ): boolean | Promise<boolean> | Observable<boolean> {
+  canActivate(context: ExecutionContext): boolean | Promise<boolean> | Observable<boolean> {
     const request = context.switchToHttp().getRequest();
     // Check for admin role in JWT or session
     // For now, allow all in development
@@ -42,9 +40,7 @@ export class BackupController {
    */
   @Post('trigger')
   @HttpCode(HttpStatus.ACCEPTED)
-  async triggerBackup(
-    @Body() dto: CreateBackupDto,
-  ): Promise<BackupResponseDto> {
+  async triggerBackup(@Body() dto: CreateBackupDto): Promise<BackupResponseDto> {
     return this.backupService.createBackup(dto);
   }
 

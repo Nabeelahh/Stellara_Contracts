@@ -74,6 +74,8 @@ fn test_academy_rewards_trigger_social_rewards() {
     let user = Address::generate(&env);
 
     academy.initialize(&admin);
+    social.init(&admin);
+
     academy.create_badge_type(
         &admin,
         &1u32,

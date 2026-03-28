@@ -40,7 +40,7 @@ export class StorageService {
           abiVersion: (eventData as any).abiVersion ?? null,
         },
       });
-      
+
       this.logger.debug(`Stored event: ${eventData.transactionHash}`);
       return event;
     } catch (error) {
@@ -66,9 +66,9 @@ export class StorageService {
       const event = await this.prisma.processedEvent.findFirst({
         where: { transactionHash },
       });
-      
+
       if (!event) return null;
-      
+
       return {
         id: event.eventId,
         type: 'contract_event',
@@ -102,9 +102,9 @@ export class StorageService {
       }
 
       if (query.toLedger) {
-        where.ledgerSeq = where.ledgerSeq ? 
-          { ...where.ledgerSeq, lte: query.toLedger } : 
-          { lte: query.toLedger };
+        where.ledgerSeq = where.ledgerSeq
+          ? { ...where.ledgerSeq, lte: query.toLedger }
+          : { lte: query.toLedger };
       }
 
       const events = await this.prisma.processedEvent.findMany({
@@ -138,9 +138,9 @@ export class StorageService {
       }
 
       if (query.toLedger) {
-        where.ledgerSeq = where.ledgerSeq ? 
-          { ...where.ledgerSeq, lte: query.toLedger } : 
-          { lte: query.toLedger };
+        where.ledgerSeq = where.ledgerSeq
+          ? { ...where.ledgerSeq, lte: query.toLedger }
+          : { lte: query.toLedger };
       }
 
       return await this.prisma.processedEvent.count({ where });
@@ -180,7 +180,7 @@ export class StorageService {
 
   async storeFailedEvent(failedEvent: FailedEvent): Promise<void> {
     this.logger.error(`Storing failed event: ${failedEvent.transactionHash}`, failedEvent.error);
-    
+
     // Log the failure
     await this.prisma.indexerLog.create({
       data: {
@@ -202,7 +202,7 @@ export class StorageService {
       take: limit,
     });
 
-    return logs.map(log => ({
+    return logs.map((log) => ({
       id: log.id,
       type: 'error',
       contractId: '',
@@ -260,7 +260,7 @@ export class StorageService {
   }> {
     try {
       const totalEvents = await this.getProcessedEventCount();
-      
+
       const uniqueContracts = await this.prisma.processedEvent.groupBy({
         by: ['contractId'],
         _count: true,
@@ -286,11 +286,11 @@ export class StorageService {
         totalEvents,
         uniqueContracts: uniqueContracts.length,
         latestLedger,
-        eventsByContract: eventsByContract.map(group => ({
+        eventsByContract: eventsByContract.map((group) => ({
           contractId: group.contractId,
           count: group._count,
         })),
-        eventsByType: eventsByType.map(group => ({
+        eventsByType: eventsByType.map((group) => ({
           eventType: group.eventType,
           count: group._count,
         })),
@@ -329,10 +329,7 @@ export class StorageService {
     return this.getEvents({ eventName, limit });
   }
 
-  async getEventsInLedgerRange(
-    fromLedger: number,
-    toLedger: number
-  ): Promise<any[]> {
+  async getEventsInLedgerRange(fromLedger: number, toLedger: number): Promise<any[]> {
     return this.getEvents({ fromLedger, toLedger });
   }
 

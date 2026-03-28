@@ -78,7 +78,12 @@ export class RabbitMqConsumerService implements OnModuleInit {
       }
 
       // Retry by publishing to delay queue.
-      await this.rabbit.publishToRetry(domain, eventName, { ...envelope, attempt: nextAttempt }, nextAttempt);
+      await this.rabbit.publishToRetry(
+        domain,
+        eventName,
+        { ...envelope, attempt: nextAttempt },
+        nextAttempt,
+      );
       this.rabbit.getChannel().ack(msg);
     }
   }
@@ -101,7 +106,9 @@ export class RabbitMqConsumerService implements OnModuleInit {
 
   private async handleEvent(domain: string, envelope: BusEnvelope): Promise<void> {
     // TODO: Replace these no-ops with real domain logic.
-    this.logger.log(`Handling event ${envelope.eventName} (domain=${domain}, id=${envelope.eventId})`);
+    this.logger.log(
+      `Handling event ${envelope.eventName} (domain=${domain}, id=${envelope.eventId})`,
+    );
     // Simulate async work.
     await delay(1);
   }
@@ -146,4 +153,3 @@ export class RabbitMqConsumerService implements OnModuleInit {
     );
   }
 }
-

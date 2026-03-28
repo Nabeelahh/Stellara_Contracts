@@ -13,7 +13,8 @@ export class ClaimService {
     // Simplified automated assessment
     claim.status = ClaimStatus.APPROVED;
     claim.payoutAmount = claim.claimAmount;
-    return this.repo.save(claim);
+    return this.repo.
+    save(claim);
   }
 
   async payClaim(claimId: string): Promise<Claim> {

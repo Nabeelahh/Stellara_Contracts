@@ -36,7 +36,7 @@ export abstract class BaseHttpException extends HttpException {
       message,
       statusCode: httpStatus,
     });
-    
+
     this.timestamp = new Date().toISOString();
     this.requestId = this.generateRequestId();
     this.path = path;
@@ -93,15 +93,11 @@ export class AuthorizationException extends BaseHttpException {
 }
 
 export class ResourceNotFoundException extends BaseHttpException {
-  constructor(
-    resource: string,
-    identifier?: string,
-    path?: string,
-  ) {
-    const message = identifier 
+  constructor(resource: string, identifier?: string, path?: string) {
+    const message = identifier
       ? `${resource} with identifier '${identifier}' not found`
       : `${resource} not found`;
-    
+
     super(message, 'RESOURCE_NOT_FOUND', HttpStatus.NOT_FOUND, undefined, path);
   }
 }

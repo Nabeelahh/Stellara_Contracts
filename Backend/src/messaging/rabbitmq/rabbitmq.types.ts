@@ -8,4 +8,3 @@ export type BusEnvelope<T = unknown> = {
   correlationId?: string;
   attempt: number;
 };
-

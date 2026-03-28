@@ -1,10 +1,10 @@
-import { 
-  Controller, 
-  Post, 
-  Get, 
-  Body, 
-  Param, 
-  Query, 
+import {
+  Controller,
+  Post,
+  Get,
+  Body,
+  Param,
+  Query,
   UseGuards,
   Request,
   HttpCode,
@@ -26,7 +26,11 @@ export class ContractInteractionController {
   @Post('call')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Call a smart contract function' })
-  @ApiResponse({ status: 200, description: 'Transaction submitted successfully', type: TransactionRecord })
+  @ApiResponse({
+    status: 200,
+    description: 'Transaction submitted successfully',
+    type: TransactionRecord,
+  })
   @ApiResponse({ status: 400, description: 'Bad request' })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   async callContract(
@@ -39,7 +43,11 @@ export class ContractInteractionController {
   @Post('deploy')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Deploy a new smart contract' })
-  @ApiResponse({ status: 200, description: 'Contract deployment submitted', type: TransactionRecord })
+  @ApiResponse({
+    status: 200,
+    description: 'Contract deployment submitted',
+    type: TransactionRecord,
+  })
   @ApiResponse({ status: 400, description: 'Bad request' })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   async deployContract(
@@ -64,14 +72,21 @@ export class ContractInteractionController {
 
   @Get('transaction/:hash')
   @ApiOperation({ summary: 'Get transaction status by hash' })
-  @ApiResponse({ status: 200, description: 'Transaction details retrieved', type: TransactionRecord })
+  @ApiResponse({
+    status: 200,
+    description: 'Transaction details retrieved',
+    type: TransactionRecord,
+  })
   @ApiResponse({ status: 404, description: 'Transaction not found' })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   async getTransactionStatus(
     @Request() req: any,
     @Param('hash') transactionHash: string,
   ): Promise<TransactionRecord> {
-    return await this.contractInteractionService.getTransactionStatus(req.user.userId, transactionHash);
+    return await this.contractInteractionService.getTransactionStatus(
+      req.user.userId,
+      transactionHash,
+    );
   }
 
   @Post('poll-transaction')
@@ -80,9 +95,7 @@ export class ContractInteractionController {
   @ApiResponse({ status: 200, description: 'Transaction completed', type: TransactionRecord })
   @ApiResponse({ status: 400, description: 'Polling timeout or error' })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
-  async pollTransactionStatus(
-    @Body() statusDto: TransactionStatusDto,
-  ): Promise<TransactionRecord> {
+  async pollTransactionStatus(@Body() statusDto: TransactionStatusDto): Promise<TransactionRecord> {
     return await this.contractInteractionService.pollTransactionStatus(statusDto);
   }
 
@@ -106,7 +119,8 @@ export class ContractInteractionController {
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   async registerContract(
     @Request() req: any,
-    @Body() registerDto: {
+    @Body()
+    registerDto: {
       contractAddress: string;
       contractName: string;
       abiDefinition: any;

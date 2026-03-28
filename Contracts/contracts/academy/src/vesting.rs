@@ -38,6 +38,30 @@ pub struct ClaimEvent {
     pub claimed_at: u64,
 }
 
+/// Alias event for vesting claim (VestingClaimed for indexer)
+#[contracttype]
+#[derive(Clone, Debug)]
+pub struct VestingClaimed {
+    pub grant_id: u64,
+    pub beneficiary: Address,
+    pub amount: i128,
+    pub claimed_at: u64,
+}
+
+/// Credential issued event (alias for grant event)
+#[contracttype]
+#[derive(Clone, Debug)]
+pub struct CredentialIssued {
+    pub grant_id: u64,
+    pub beneficiary: Address,
+    pub amount: i128,
+    pub start_time: u64,
+    pub cliff: u64,
+    pub duration: u64,
+    pub granted_at: u64,
+    pub granted_by: Address,
+}
+
 /// Revoke event for off-chain indexing
 #[contracttype]
 #[derive(Clone, Debug)]
@@ -185,19 +209,36 @@ impl AcademyVestingContract {
         // Update counter
         env.storage().persistent().set(&counter_key, &next_id);
 
+        let current_timestamp = env.ledger().timestamp();
+
         // Emit grant event
         let grant_event = GrantEvent {
+            grant_id: next_id,
+            beneficiary: beneficiary.clone(),
+            amount,
+            start_time,
+            cliff,
+            duration,
+            granted_at: current_timestamp,
+            granted_by: admin.clone(),
+        };
+
+        env.events().publish((symbol_short!("grant"),), grant_event);
+
+        // Emit CredentialIssued event (for indexer compatibility)
+        let credential_event = CredentialIssued {
             grant_id: next_id,
             beneficiary,
             amount,
             start_time,
             cliff,
             duration,
-            granted_at: env.ledger().timestamp(),
+            granted_at: current_timestamp,
             granted_by: admin,
         };
 
-        env.events().publish((symbol_short!("grant"),), grant_event);
+        env.events()
+            .publish((symbol_short!("cred_iss"),), credential_event);
 
         Ok(next_id)
     }
@@ -266,15 +307,28 @@ impl AcademyVestingContract {
             &vested_amount,
         );
 
+        let current_time = env.ledger().timestamp();
+
         // Emit claim event
         let claim_event = ClaimEvent {
             grant_id,
-            beneficiary,
+            beneficiary: beneficiary.clone(),
             amount: vested_amount,
-            claimed_at: env.ledger().timestamp(),
+            claimed_at: current_time,
         };
 
         env.events().publish((symbol_short!("claim"),), claim_event);
+
+        // Emit VestingClaimed event (for indexer)
+        let vesting_claimed = VestingClaimed {
+            grant_id,
+            beneficiary,
+            amount: vested_amount,
+            claimed_at: current_time,
+        };
+
+        env.events()
+            .publish((symbol_short!("v_claimed"),), vesting_claimed);
 
         Ok(vested_amount)
     }

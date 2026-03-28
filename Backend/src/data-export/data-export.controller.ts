@@ -1,11 +1,11 @@
-import { 
-  Controller, 
-  Get, 
-  Post, 
-  Delete, 
-  Query, 
-  Body, 
-  Param, 
+import {
+  Controller,
+  Get,
+  Post,
+  Delete,
+  Query,
+  Body,
+  Param,
   UseGuards,
   Request,
   HttpCode,
@@ -17,7 +17,7 @@ import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagg
 import { Response } from 'express';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { DataExportService } from './data-export.service';
-import { 
+import {
   CreateExportDto,
   ExportStatusDto,
   DownloadExportDto,
@@ -83,7 +83,7 @@ export class DataExportController {
     @Res() res: Response,
   ): Promise<void> {
     const exportJob = await this.dataExportService.getExportStatus(req.user.userId, exportId);
-    
+
     if (exportJob.status !== 'completed') {
       res.status(400).json({ message: 'Export not ready for download' });
       return;
@@ -91,7 +91,7 @@ export class DataExportController {
 
     // In a real implementation, you would validate the token here
     // and serve the file from the file system or cloud storage
-    
+
     res.status(200).json({
       message: 'File download endpoint',
       exportId,

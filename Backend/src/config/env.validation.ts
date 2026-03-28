@@ -170,6 +170,58 @@ class EnvironmentVariables {
 
   @IsOptional()
   @IsString()
+  IPFS_HOST?: string;
+
+  @IsOptional()
+  @IsNumber()
+  IPFS_PORT?: number;
+
+  @IsOptional()
+  @IsString()
+  IPFS_PROTOCOL?: string;
+
+  @IsOptional()
+  @IsString()
+  IPFS_PROJECT_ID?: string;
+
+  @IsOptional()
+  @IsString()
+  IPFS_PROJECT_SECRET?: string;
+
+  @IsOptional()
+  @IsString()
+  IPFS_API_KEY?: string;
+
+  @IsOptional()
+  @IsString()
+  IPFS_API_SECRET?: string;
+
+  @IsOptional()
+  @IsString()
+  IPFS_GATEWAY_URL?: string;
+
+  @IsOptional()
+  @IsString()
+  ARWEAVE_WALLET_JSON?: string;
+
+  @IsOptional()
+  @IsString()
+  ARWEAVE_HOST?: string;
+
+  @IsOptional()
+  @IsNumber()
+  ARWEAVE_PORT?: number;
+
+  @IsOptional()
+  @IsString()
+  ARWEAVE_PROTOCOL?: string;
+
+  @IsOptional()
+  @IsString()
+  ARWEAVE_GATEWAY_URL?: string;
+
+  @IsOptional()
+  @IsString()
   S3_BACKUP_BUCKET?: string;
 
   @IsOptional()

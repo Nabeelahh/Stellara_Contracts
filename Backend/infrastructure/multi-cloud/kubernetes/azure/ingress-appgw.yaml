@@ -1,0 +1,41 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: stellara-backend-ingress-azure
+  namespace: stellara-backend
+  labels:
+    app.kubernetes.io/name: stellara-backend
+    app.kubernetes.io/component: ingress
+    app.kubernetes.io/part-of: stellara
+  annotations:
+    # Azure Application Gateway Ingress Controller annotations
+    kubernetes.io/ingress.class: azure/application-gateway
+    appgw.ingress.kubernetes.io/backend-path-prefix: /
+    appgw.ingress.kubernetes.io/ssl-redirect: "true"
+    appgw.ingress.kubernetes.io/backend-protocol: "http"
+    appgw.ingress.kubernetes.io/health-probe-path: "/api/v1/health"
+    appgw.ingress.kubernetes.io/health-probe-status-codes: "200-399"
+    appgw.ingress.kubernetes.io/request-timeout: "30"
+    appgw.ingress.kubernetes.io/connection-draining: "true"
+    appgw.ingress.kubernetes.io/connection-draining-timeout: "30"
+    # WAF configuration
+    appgw.ingress.kubernetes.io/waf-policy-for-path: "/api/v1/sensitive=waf-policy-id"
+    # Multi-region routing
+    appgw.ingress.kubernetes.io/hostname-extension: "api.stellara.io"
+spec:
+  ingressClassName: azure/application-gateway
+  tls:
+  - hosts:
+    - api.stellara.io
+    secretName: stellara-backend-tls
+  rules:
+  - host: api.stellara.io
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: stellara-backend
+            port:
+              number: 80

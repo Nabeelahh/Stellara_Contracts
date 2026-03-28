@@ -9,7 +9,11 @@ import { SqlInjectionDetectedError, sanitizeDeep } from './sanitization.utils';
  * - Recursive removal of NoSQL operator keys (`$...`) and prototype-pollution keys
  * - SQLi heuristic detection with hard fail (403/400)
  */
-export function inputSanitizationMiddleware(req: Request, _res: Response, next: NextFunction): void {
+export function inputSanitizationMiddleware(
+  req: Request,
+  _res: Response,
+  next: NextFunction,
+): void {
   try {
     if (req.body) req.body = sanitizeDeep(req.body);
     if (req.query) req.query = sanitizeDeep(req.query);
@@ -22,4 +26,3 @@ export function inputSanitizationMiddleware(req: Request, _res: Response, next: 
     return next(err);
   }
 }
-

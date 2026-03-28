@@ -1,5 +1,6 @@
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { createHmac, timingSafeEqual } from 'node:crypto';
+import { CircuitBreakerService } from '../circuit-breaker/circuit-breaker.service';
 import { PrismaService } from '../prisma.service';
 import {
   CreateWebhookSubscriptionDto,
@@ -17,7 +18,18 @@ const BASE_RETRY_DELAY_MS = 60_000;
 export class WebhooksService {
   private readonly logger = new Logger(WebhooksService.name);
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly circuitBreakerService: CircuitBreakerService,
+  ) {
+    this.circuitBreakerService.register('external-webhooks', {
+      failureThreshold: 5,
+      failureWindowMs: 10_000,
+      openTimeoutMs: 30_000,
+      halfOpenMaxCalls: 10,
+      halfOpenSuccessThreshold: 3,
+    });
+  }
 
   async createSubscription(dto: CreateWebhookSubscriptionDto, actorId?: string) {
     return (this.prisma as any).webhookSubscription.create({
@@ -83,10 +95,7 @@ export class WebhooksService {
   }
 
   async publishEvent(dto: PublishWebhookEventDto) {
-    const matchingSubscriptions = await this.findMatchingSubscriptions(
-      dto.eventType,
-      dto.tenantId,
-    );
+    const matchingSubscriptions = await this.findMatchingSubscriptions(dto.eventType, dto.tenantId);
 
     const event = await (this.prisma as any).webhookEvent.create({
       data: {
@@ -154,9 +163,7 @@ export class WebhooksService {
         where: tenantId ? { tenantId } : {},
       }),
       (this.prisma as any).webhookDelivery.findMany({
-        where: tenantId
-          ? { subscription: { tenantId } }
-          : {},
+        where: tenantId ? { subscription: { tenantId } } : {},
         include: {
           subscription: {
             select: {
@@ -182,9 +189,7 @@ export class WebhooksService {
       return acc;
     }, {});
 
-    const failures = deliveries
-      .filter((delivery) => delivery.status === 'FAILED')
-      .slice(0, 20);
+    const failures = deliveries.filter((delivery) => delivery.status === 'FAILED').slice(0, 20);
 
     return {
       subscriptions: {
@@ -298,21 +303,23 @@ export class WebhooksService {
     const timeoutMs = this.resolveTimeoutMs();
 
     try {
-      const response = await fetch(delivery.subscription.url, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'User-Agent': 'Stellara-Webhooks/1.0',
-          'X-Stellara-Event': delivery.event.eventType,
-          'X-Stellara-Delivery': delivery.id,
-          'X-Stellara-Attempt': `${attemptNumber}`,
-          'X-Stellara-Timestamp': timestamp,
-          'X-Stellara-Signature': signature,
-          ...this.normalizeHeaders(delivery.subscription.customHeaders),
-        },
-        body,
-        signal: AbortSignal.timeout(timeoutMs),
-      });
+      const response = await this.circuitBreakerService.execute('external-webhooks', () =>
+        fetch(delivery.subscription.url, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'User-Agent': 'Stellara-Webhooks/1.0',
+            'X-Stellara-Event': delivery.event.eventType,
+            'X-Stellara-Delivery': delivery.id,
+            'X-Stellara-Attempt': `${attemptNumber}`,
+            'X-Stellara-Timestamp': timestamp,
+            'X-Stellara-Signature': signature,
+            ...this.normalizeHeaders(delivery.subscription.customHeaders),
+          },
+          body,
+          signal: AbortSignal.timeout(timeoutMs),
+        }),
+      );
 
       const responseBody = await response.text();
       const success = response.status >= 200 && response.status < 300;

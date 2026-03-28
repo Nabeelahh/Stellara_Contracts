@@ -1,7 +1,12 @@
 import { Controller, Post, Body } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBody, ApiBearerAuth } from '@nestjs/swagger';
 import { StorageService } from './storage.service';
-import { ProjectMetadataDto, PinMetadataResponseDto, BannerUploadDto, VerifyHashResponseDto } from './dto/storage.dto';
+import {
+  ProjectMetadataDto,
+  PinMetadataResponseDto,
+  BannerUploadDto,
+  VerifyHashResponseDto,
+} from './dto/storage.dto';
 
 @ApiTags('storage')
 @ApiBearerAuth('JWT-auth')
@@ -10,38 +15,39 @@ export class StorageController {
   constructor(private readonly storageService: StorageService) {}
 
   @Post('metadata')
-  @ApiOperation({ 
+  @ApiOperation({
     summary: 'Pin project metadata to IPFS',
-    description: 'Uploads and pins project metadata to IPFS, returning the content identifier (CID)'
+    description:
+      'Uploads and pins project metadata to IPFS, returning the content identifier (CID)',
   })
   @ApiBody({ type: ProjectMetadataDto })
-  @ApiResponse({ 
-    status: 201, 
+  @ApiResponse({
+    status: 201,
     description: 'Metadata pinned successfully',
-    type: PinMetadataResponseDto 
+    type: PinMetadataResponseDto,
   })
-  @ApiResponse({ 
-    status: 400, 
-    description: 'Invalid metadata format' 
+  @ApiResponse({
+    status: 400,
+    description: 'Invalid metadata format',
   })
   async pinProjectMetadata(@Body() metadata: ProjectMetadataDto): Promise<string> {
     return this.storageService.pinProjectMetadata(metadata);
   }
 
   @Post('banner')
-  @ApiOperation({ 
+  @ApiOperation({
     summary: 'Upload and optimize banner image',
-    description: 'Optimizes a banner image and uploads it to IPFS storage'
+    description: 'Optimizes a banner image and uploads it to IPFS storage',
   })
   @ApiBody({ type: BannerUploadDto })
-  @ApiResponse({ 
-    status: 201, 
+  @ApiResponse({
+    status: 201,
     description: 'Banner uploaded successfully',
-    type: PinMetadataResponseDto 
+    type: PinMetadataResponseDto,
   })
-  @ApiResponse({ 
-    status: 400, 
-    description: 'Invalid image format or dimensions' 
+  @ApiResponse({
+    status: 400,
+    description: 'Invalid image format or dimensions',
   })
   async optimizeAndUploadBanner(@Body() banner: BannerUploadDto): Promise<string> {
     const optimizedImage = await this.storageService.optimizeImage(
@@ -54,9 +60,9 @@ export class StorageController {
   }
 
   @Post('verify-hash')
-  @ApiOperation({ 
+  @ApiOperation({
     summary: 'Verify IPFS hash',
-    description: 'Verifies if an IPFS hash is valid and retrievable from the network'
+    description: 'Verifies if an IPFS hash is valid and retrievable from the network',
   })
   @ApiBody({
     schema: {
@@ -70,10 +76,10 @@ export class StorageController {
       },
     },
   })
-  @ApiResponse({ 
-    status: 200, 
+  @ApiResponse({
+    status: 200,
     description: 'Hash verification result',
-    type: VerifyHashResponseDto 
+    type: VerifyHashResponseDto,
   })
   async verifyIPFSHash(@Body('hash') hash: string): Promise<boolean> {
     return this.storageService.verifyIPFSHash(hash);

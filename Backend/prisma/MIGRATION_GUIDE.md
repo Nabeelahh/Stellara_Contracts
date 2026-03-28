@@ -34,9 +34,10 @@ npm run db:migrate:deploy
 ```
 
 > Prisma does not generate automatic down migrations. The rollback script
-> removes migration records from `_prisma_migrations` so `migrate deploy`
-> will re-apply them. For destructive rollbacks (dropping columns/tables),
-> write a new migration that reverses the change.
+> resets the `public` schema, re-applies only the migrations that should stay,
+> and leaves the rolled-back migration folders ready for a later
+> `migrate deploy`. For destructive data rollbacks, write a new migration that
+> explicitly restores the old shape and data.
 
 ## Seed Data
 

@@ -111,7 +111,9 @@ export class TenantQuotaService {
     return result;
   }
 
-  async consumeApiCallOrThrow(tenantId: string): Promise<{ used: number; limit: number; period: string }> {
+  async consumeApiCallOrThrow(
+    tenantId: string,
+  ): Promise<{ used: number; limit: number; period: string }> {
     const now = new Date();
     const period = getPeriodKey(now);
     const ttlSeconds = getSecondsUntilUtcMonthEnd(now);
@@ -221,7 +223,12 @@ export class TenantQuotaService {
     };
   }
 
-  private async sendQuotaWarning(tenantId: string, used: number, limit: number, thresholdLabel: string): Promise<void> {
+  private async sendQuotaWarning(
+    tenantId: string,
+    used: number,
+    limit: number,
+    thresholdLabel: string,
+  ): Promise<void> {
     // Find the tenant admin to notify.
     const adminUser = await this.prisma.user.findFirst({
       where: { tenantId, roles: { has: 'TENANT_ADMIN' } },
@@ -238,7 +245,7 @@ export class TenantQuotaService {
       NotificationType.SYSTEM,
       `Quota warning: ${thresholdLabel}`,
       `Your tenant has reached ${thresholdLabel} of its monthly API quota. Used: ${used}, Limit: ${limit}. Period: ${getPeriodKey(
-        new Date()
+        new Date(),
       )}`,
       { tenantId, used, limit, thresholdLabel },
     );
@@ -288,7 +295,8 @@ export class TenantQuotaService {
     }
     await pipeline.exec();
 
-    this.logger.log(`Monthly quota reset complete for ${tenantIds.length} tenants (period ${prevPeriod}).`);
+    this.logger.log(
+      `Monthly quota reset complete for ${tenantIds.length} tenants (period ${prevPeriod}).`,
+    );
   }
 }
-

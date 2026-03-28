@@ -22,14 +22,11 @@ describe('resolveDistributedLockKeys', () => {
   });
 
   it('supports multiple lock keys and de-duplicates them', () => {
-    const keys = resolveDistributedLockKeys(
-      ['user:{id}', 'trade:{trade.id}', 'user:{id}'],
-      {
-        args: [{ id: 'user-123' }, { trade: { id: 'trade-456' } }],
-        instance: {},
-        methodName: 'SettlementService.process',
-      },
-    );
+    const keys = resolveDistributedLockKeys(['user:{id}', 'trade:{trade.id}', 'user:{id}'], {
+      args: [{ id: 'user-123' }, { trade: { id: 'trade-456' } }],
+      instance: {},
+      methodName: 'SettlementService.process',
+    });
 
     expect(keys).toEqual(['user:user-123', 'trade:trade-456']);
   });

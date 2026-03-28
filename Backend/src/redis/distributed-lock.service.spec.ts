@@ -3,10 +3,7 @@ import { AsyncContextService } from '../logging/services/async-context.service';
 import { DistributedLockService } from './distributed-lock.service';
 
 class FakeRedisClient {
-  private readonly store = new Map<
-    string,
-    { value: string; expiresAt: number | null }
-  >();
+  private readonly store = new Map<string, { value: string; expiresAt: number | null }>();
   private readonly hashes = new Map<string, Map<string, number>>();
 
   async set(
@@ -87,13 +84,10 @@ class FakeRedisClient {
 
   async hgetall(key: string): Promise<Record<string, string>> {
     const hash = this.hashes.get(key) ?? new Map<string, number>();
-    return Array.from(hash.entries()).reduce<Record<string, string>>(
-      (acc, [field, value]) => {
-        acc[field] = `${value}`;
-        return acc;
-      },
-      {},
-    );
+    return Array.from(hash.entries()).reduce<Record<string, string>>((acc, [field, value]) => {
+      acc[field] = `${value}`;
+      return acc;
+    }, {});
   }
 
   private cleanupExpired(): void {
@@ -173,13 +167,7 @@ describe('DistributedLockService', () => {
   });
 
   it('times out when another owner keeps the lock', async () => {
-    await redisClient.set(
-      'distributed-lock:user:123',
-      'different-owner',
-      'PX',
-      1_000,
-      'NX',
-    );
+    await redisClient.set('distributed-lock:user:123', 'different-owner', 'PX', 1_000, 'NX');
 
     await expect(
       service.executeWithLock({

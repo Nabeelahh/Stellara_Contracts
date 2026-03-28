@@ -1,15 +1,7 @@
 import { plainToInstance } from 'class-transformer';
 import { validate } from 'class-validator';
-import {
-  containsSqlInjection,
-  containsXss,
-  sanitizeDeep,
-} from './sanitization.utils';
-import {
-  NoNoSqlOperators,
-  NoSqlInjection,
-  SanitizeHtml,
-} from './sanitization.decorators';
+import { containsSqlInjection, containsXss, sanitizeDeep } from './sanitization.utils';
+import { NoNoSqlOperators, NoSqlInjection, SanitizeHtml } from './sanitization.decorators';
 
 describe('Input sanitization & validators', () => {
   it('strips script/XSS content from HTML strings', () => {
@@ -31,7 +23,7 @@ describe('Input sanitization & validators', () => {
       ok: 'yes',
       filter: { $ne: 'x', name: 'bob' },
       $gt: 5,
-      '__proto__': { polluted: true },
+      __proto__: { polluted: true },
     });
 
     expect((sanitized as any).ok).toBe('yes');
@@ -75,4 +67,3 @@ describe('Input sanitization & validators', () => {
     expect(errors.length).toBeGreaterThan(0);
   });
 });
-

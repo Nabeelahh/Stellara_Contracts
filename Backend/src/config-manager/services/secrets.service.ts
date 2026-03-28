@@ -24,9 +24,7 @@ export class SecretsService implements OnModuleInit {
 
     this.client = new SecretsManagerClient({
       region,
-      ...(accessKeyId && secretAccessKey
-        ? { credentials: { accessKeyId, secretAccessKey } }
-        : {}),
+      ...(accessKeyId && secretAccessKey ? { credentials: { accessKeyId, secretAccessKey } } : {}),
     });
   }
 
@@ -37,9 +35,7 @@ export class SecretsService implements OnModuleInit {
     }
 
     try {
-      const response = await this.client.send(
-        new GetSecretValueCommand({ SecretId: secretId }),
-      );
+      const response = await this.client.send(new GetSecretValueCommand({ SecretId: secretId }));
       const value = response.SecretString ?? null;
       if (value) {
         this.cache.set(secretId, { value, expiresAt: Date.now() + this.cacheTtlMs });
@@ -55,14 +51,10 @@ export class SecretsService implements OnModuleInit {
     try {
       // Check if secret exists
       await this.client.send(new DescribeSecretCommand({ SecretId: secretId }));
-      await this.client.send(
-        new UpdateSecretCommand({ SecretId: secretId, SecretString: value }),
-      );
+      await this.client.send(new UpdateSecretCommand({ SecretId: secretId, SecretString: value }));
     } catch (err: any) {
       if (err?.name === 'ResourceNotFoundException') {
-        await this.client.send(
-          new CreateSecretCommand({ Name: secretId, SecretString: value }),
-        );
+        await this.client.send(new CreateSecretCommand({ Name: secretId, SecretString: value }));
       } else {
         throw err;
       }

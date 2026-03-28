@@ -14,7 +14,7 @@ export class PermissionsGuard implements CanActivate {
       context.getHandler(),
       context.getClass(),
     ]);
-    
+
     const requiredPermissions = this.reflector.getAllAndOverride<Permission[]>(PERMISSIONS_KEY, [
       context.getHandler(),
       context.getClass(),
@@ -31,18 +31,22 @@ export class PermissionsGuard implements CanActivate {
 
     // Role-based check (Hierarchical or Simple)
     const hasRole = !requiredRoles || requiredRoles.some((role) => user.roles.includes(role));
-    
+
     // Permission-based check
     let hasPermission = true;
     if (requiredPermissions) {
       const userPermissions = user.roles.flatMap((role: Role) => RolePermissions[role] || []);
-      hasPermission = requiredPermissions.every((permission) => userPermissions.includes(permission));
+      hasPermission = requiredPermissions.every((permission) =>
+        userPermissions.includes(permission),
+      );
     }
 
     if (hasRole && hasPermission) {
       return true;
     }
 
-    throw new ForbiddenException('You do not have the required permissions to access this resource');
+    throw new ForbiddenException(
+      'You do not have the required permissions to access this resource',
+    );
   }
 }

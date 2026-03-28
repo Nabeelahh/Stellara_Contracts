@@ -36,10 +36,7 @@ export function parseDurationToSeconds(
   value: string | number | undefined,
   fallbackSeconds: number,
 ): number {
-  const milliseconds = parseDurationToMilliseconds(
-    value,
-    fallbackSeconds * 1000,
-  );
+  const milliseconds = parseDurationToMilliseconds(value, fallbackSeconds * 1000);
 
   return Math.max(1, Math.floor(milliseconds / 1000));
 }

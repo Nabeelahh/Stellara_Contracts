@@ -5,18 +5,24 @@ import { Repository, DataSource, SelectQueryBuilder } from 'typeorm';
 import { Client } from '@elastic/elasticsearch';
 
 import { User } from '../auth/entities/user.entity';
-import { TransactionRecord, TransactionStatus } from '../contract-interaction/entities/transaction-record.entity';
-import { ContractMetadata, ContractStatus } from '../contract-interaction/entities/contract-metadata.entity';
+import {
+  TransactionRecord,
+  TransactionStatus,
+} from '../contract-interaction/entities/transaction-record.entity';
+import {
+  ContractMetadata,
+  ContractStatus,
+} from '../contract-interaction/entities/contract-metadata.entity';
 import { Workflow } from '../workflow/entities/workflow.entity';
 import { AuditLog } from '../audit/audit.entity';
 
-import { 
-  SearchQueryDto, 
-  SearchResponseDto, 
-  SearchResultDto, 
+import {
+  SearchQueryDto,
+  SearchResponseDto,
+  SearchResultDto,
   FacetResultDto,
   SearchEntityType,
-  SortOrder 
+  SortOrder,
 } from './dto/search.dto';
 
 @Injectable()
@@ -39,8 +45,8 @@ export class SearchService {
     private configService: ConfigService,
     private dataSource: DataSource,
   ) {
-    this.useElasticsearch = this.configService.get<string('ELASTICSEARCH_URL') !== undefined;
-    
+    this.useElasticsearch = this.configService.get < string('ELASTICSEARCH_URL') !== undefined;
+
     if (this.useElasticsearch) {
       this.elasticsearchClient = new Client({
         node: this.configService.get<string>('ELASTICSEARCH_URL'),
@@ -51,7 +57,7 @@ export class SearchService {
 
   async search(searchQuery: SearchQueryDto): Promise<SearchResponseDto> {
     const startTime = Date.now();
-    
+
     if (this.useElasticsearch) {
       return await this.elasticsearchSearch(searchQuery, startTime);
     } else {
@@ -116,13 +122,18 @@ export class SearchService {
     }
   }
 
-  private async elasticsearchSearch(searchQuery: SearchQueryDto, startTime: number): Promise<SearchResponseDto> {
-    const { query, entityTypes, filters, page, limit, sortBy, sortOrder, highlight, facets } = searchQuery;
+  private async elasticsearchSearch(
+    searchQuery: SearchQueryDto,
+    startTime: number,
+  ): Promise<SearchResponseDto> {
+    const { query, entityTypes, filters, page, limit, sortBy, sortOrder, highlight, facets } =
+      searchQuery;
     const offset = (page - 1) * limit;
 
-    const indices = entityTypes && entityTypes.length > 0 
-      ? entityTypes.map(type => `stellara_${type}`).join(',')
-      : 'stellara_*';
+    const indices =
+      entityTypes && entityTypes.length > 0
+        ? entityTypes.map((type) => `stellara_${type}`).join(',')
+        : 'stellara_*';
 
     const searchBody: any = {
       query: this.buildElasticsearchQuery(query, filters),
@@ -160,7 +171,10 @@ export class SearchService {
     }
   }
 
-  private async postgresSearch(searchQuery: SearchQueryDto, startTime: number): Promise<SearchResponseDto> {
+  private async postgresSearch(
+    searchQuery: SearchQueryDto,
+    startTime: number,
+  ): Promise<SearchResponseDto> {
     const { query, entityTypes, filters, page, limit, sortBy, sortOrder } = searchQuery;
     const offset = (page - 1) * limit;
 
@@ -174,25 +188,53 @@ export class SearchService {
     }
 
     if (!entityTypes || entityTypes.includes(SearchEntityType.TRANSACTION)) {
-      const transactionResults = await this.searchTransactions(query, filters, offset, limit, sortBy, sortOrder);
+      const transactionResults = await this.searchTransactions(
+        query,
+        filters,
+        offset,
+        limit,
+        sortBy,
+        sortOrder,
+      );
       results.push(...transactionResults.items);
       total += transactionResults.total;
     }
 
     if (!entityTypes || entityTypes.includes(SearchEntityType.CONTRACT)) {
-      const contractResults = await this.searchContracts(query, filters, offset, limit, sortBy, sortOrder);
+      const contractResults = await this.searchContracts(
+        query,
+        filters,
+        offset,
+        limit,
+        sortBy,
+        sortOrder,
+      );
       results.push(...contractResults.items);
       total += contractResults.total;
     }
 
     if (!entityTypes || entityTypes.includes(SearchEntityType.WORKFLOW)) {
-      const workflowResults = await this.searchWorkflows(query, filters, offset, limit, sortBy, sortOrder);
+      const workflowResults = await this.searchWorkflows(
+        query,
+        filters,
+        offset,
+        limit,
+        sortBy,
+        sortOrder,
+      );
       results.push(...workflowResults.items);
       total += workflowResults.total;
     }
 
     if (!entityTypes || entityTypes.includes(SearchEntityType.AUDIT_LOG)) {
-      const auditResults = await this.searchAuditLogs(query, filters, offset, limit, sortBy, sortOrder);
+      const auditResults = await this.searchAuditLogs(
+        query,
+        filters,
+        offset,
+        limit,
+        sortBy,
+        sortOrder,
+      );
       results.push(...auditResults.items);
       total += auditResults.total;
     }
@@ -273,7 +315,11 @@ export class SearchService {
     };
   }
 
-  private formatElasticsearchResponse(response: any, searchQuery: SearchQueryDto, startTime: number): SearchResponseDto {
+  private formatElasticsearchResponse(
+    response: any,
+    searchQuery: SearchQueryDto,
+    startTime: number,
+  ): SearchResponseDto {
     const results: SearchResultDto[] = response.body.hits.hits.map((hit: any) => ({
       id: hit._id,
       entityType: hit._index.replace('stellara_', ''),
@@ -309,8 +355,16 @@ export class SearchService {
     };
   }
 
-  private async searchUsers(query: string, filters: any, offset: number, limit: number, sortBy: string, sortOrder: SortOrder): Promise<{ items: SearchResultDto[]; total: number }> {
-    const queryBuilder = this.userRepository.createQueryBuilder('user')
+  private async searchUsers(
+    query: string,
+    filters: any,
+    offset: number,
+    limit: number,
+    sortBy: string,
+    sortOrder: SortOrder,
+  ): Promise<{ items: SearchResultDto[]; total: number }> {
+    const queryBuilder = this.userRepository
+      .createQueryBuilder('user')
       .where('user.email ILIKE :query OR user.username ILIKE :query', { query: `%${query}%` });
 
     if (filters?.status) {
@@ -322,7 +376,7 @@ export class SearchService {
 
     const [users, total] = await queryBuilder.getManyAndCount();
 
-    const items: SearchResultDto[] = users.map(user => ({
+    const items: SearchResultDto[] = users.map((user) => ({
       id: user.id,
       entityType: SearchEntityType.USER,
       title: user.username || user.email,
@@ -335,10 +389,21 @@ export class SearchService {
     return { items, total };
   }
 
-  private async searchTransactions(query: string, filters: any, offset: number, limit: number, sortBy: string, sortOrder: SortOrder): Promise<{ items: SearchResultDto[]; total: number }> {
-    const queryBuilder = this.transactionRepository.createQueryBuilder('transaction')
+  private async searchTransactions(
+    query: string,
+    filters: any,
+    offset: number,
+    limit: number,
+    sortBy: string,
+    sortOrder: SortOrder,
+  ): Promise<{ items: SearchResultDto[]; total: number }> {
+    const queryBuilder = this.transactionRepository
+      .createQueryBuilder('transaction')
       .leftJoinAndSelect('transaction.user', 'user')
-      .where('transaction.transactionHash ILIKE :query OR CAST(transaction.functionCall AS TEXT) ILIKE :query', { query: `%${query}%` });
+      .where(
+        'transaction.transactionHash ILIKE :query OR CAST(transaction.functionCall AS TEXT) ILIKE :query',
+        { query: `%${query}%` },
+      );
 
     if (filters?.status) {
       queryBuilder.andWhere('transaction.status = :status', { status: filters.status });
@@ -347,7 +412,9 @@ export class SearchService {
       queryBuilder.andWhere('transaction.userId = :userId', { userId: filters.userId });
     }
     if (filters?.contractAddress) {
-      queryBuilder.andWhere('transaction.contractId = :contractAddress', { contractAddress: filters.contractAddress });
+      queryBuilder.andWhere('transaction.contractId = :contractAddress', {
+        contractAddress: filters.contractAddress,
+      });
     }
 
     queryBuilder.orderBy(`transaction.${sortBy}`, sortOrder);
@@ -355,7 +422,7 @@ export class SearchService {
 
     const [transactions, total] = await queryBuilder.getManyAndCount();
 
-    const items: SearchResultDto[] = transactions.map(transaction => ({
+    const items: SearchResultDto[] = transactions.map((transaction) => ({
       id: transaction.id,
       entityType: SearchEntityType.TRANSACTION,
       title: `Transaction ${transaction.transactionHash}`,
@@ -368,10 +435,20 @@ export class SearchService {
     return { items, total };
   }
 
-  private async searchContracts(query: string, filters: any, offset: number, limit: number, sortBy: string, sortOrder: SortOrder): Promise<{ items: SearchResultDto[]; total: number }> {
-    const queryBuilder = this.contractRepository.createQueryBuilder('contract')
+  private async searchContracts(
+    query: string,
+    filters: any,
+    offset: number,
+    limit: number,
+    sortBy: string,
+    sortOrder: SortOrder,
+  ): Promise<{ items: SearchResultDto[]; total: number }> {
+    const queryBuilder = this.contractRepository
+      .createQueryBuilder('contract')
       .leftJoinAndSelect('contract.user', 'user')
-      .where('contract.contractName ILIKE :query OR contract.contractAddress ILIKE :query', { query: `%${query}%` });
+      .where('contract.contractName ILIKE :query OR contract.contractAddress ILIKE :query', {
+        query: `%${query}%`,
+      });
 
     if (filters?.status) {
       queryBuilder.andWhere('contract.status = :status', { status: filters.status });
@@ -385,7 +462,7 @@ export class SearchService {
 
     const [contracts, total] = await queryBuilder.getManyAndCount();
 
-    const items: SearchResultDto[] = contracts.map(contract => ({
+    const items: SearchResultDto[] = contracts.map((contract) => ({
       id: contract.id,
       entityType: SearchEntityType.CONTRACT,
       title: contract.contractName,
@@ -398,9 +475,19 @@ export class SearchService {
     return { items, total };
   }
 
-  private async searchWorkflows(query: string, filters: any, offset: number, limit: number, sortBy: string, sortOrder: SortOrder): Promise<{ items: SearchResultDto[]; total: number }> {
-    const queryBuilder = this.workflowRepository.createQueryBuilder('workflow')
-      .where('workflow.name ILIKE :query OR workflow.description ILIKE :query', { query: `%${query}%` });
+  private async searchWorkflows(
+    query: string,
+    filters: any,
+    offset: number,
+    limit: number,
+    sortBy: string,
+    sortOrder: SortOrder,
+  ): Promise<{ items: SearchResultDto[]; total: number }> {
+    const queryBuilder = this.workflowRepository
+      .createQueryBuilder('workflow')
+      .where('workflow.name ILIKE :query OR workflow.description ILIKE :query', {
+        query: `%${query}%`,
+      });
 
     if (filters?.status) {
       queryBuilder.andWhere('workflow.status = :status', { status: filters.status });
@@ -414,7 +501,7 @@ export class SearchService {
 
     const [workflows, total] = await queryBuilder.getManyAndCount();
 
-    const items: SearchResultDto[] = workflows.map(workflow => ({
+    const items: SearchResultDto[] = workflows.map((workflow) => ({
       id: workflow.id,
       entityType: SearchEntityType.WORKFLOW,
       title: workflow.name,
@@ -427,19 +514,34 @@ export class SearchService {
     return { items, total };
   }
 
-  private async searchAuditLogs(query: string, filters: any, offset: number, limit: number, sortBy: string, sortOrder: SortOrder): Promise<{ items: SearchResultDto[]; total: number }> {
-    const queryBuilder = this.auditLogRepository.createQueryBuilder('audit')
-      .where('audit.action ILIKE :query OR audit.resource ILIKE :query OR CAST(audit.details AS TEXT) ILIKE :query', { query: `%${query}%` });
+  private async searchAuditLogs(
+    query: string,
+    filters: any,
+    offset: number,
+    limit: number,
+    sortBy: string,
+    sortOrder: SortOrder,
+  ): Promise<{ items: SearchResultDto[]; total: number }> {
+    const queryBuilder = this.auditLogRepository
+      .createQueryBuilder('audit')
+      .where(
+        'audit.action ILIKE :query OR audit.resource ILIKE :query OR CAST(audit.details AS TEXT) ILIKE :query',
+        { query: `%${query}%` },
+      );
 
     if (filters?.userId) {
       queryBuilder.andWhere('audit.userId = :userId', { userId: filters.userId });
     }
     if (filters?.dateRange) {
       if (filters.dateRange.startDate) {
-        queryBuilder.andWhere('audit.createdAt >= :startDate', { startDate: filters.dateRange.startDate });
+        queryBuilder.andWhere('audit.createdAt >= :startDate', {
+          startDate: filters.dateRange.startDate,
+        });
       }
       if (filters.dateRange.endDate) {
-        queryBuilder.andWhere('audit.createdAt <= :endDate', { endDate: filters.dateRange.endDate });
+        queryBuilder.andWhere('audit.createdAt <= :endDate', {
+          endDate: filters.dateRange.endDate,
+        });
       }
     }
 
@@ -448,7 +550,7 @@ export class SearchService {
 
     const [auditLogs, total] = await queryBuilder.getManyAndCount();
 
-    const items: SearchResultDto[] = auditLogs.map(audit => ({
+    const items: SearchResultDto[] = auditLogs.map((audit) => ({
       id: audit.id,
       entityType: SearchEntityType.AUDIT_LOG,
       title: `${audit.action} - ${audit.resource}`,
@@ -461,7 +563,10 @@ export class SearchService {
     return { items, total };
   }
 
-  private async getPostgresSuggestions(query: string, entityType?: SearchEntityType): Promise<string[]> {
+  private async getPostgresSuggestions(
+    query: string,
+    entityType?: SearchEntityType,
+  ): Promise<string[]> {
     const suggestions: string[] = [];
     const queryLower = query.toLowerCase();
 
@@ -472,7 +577,7 @@ export class SearchService {
         .select('user.username')
         .limit(5)
         .getMany();
-      suggestions.push(...users.map(u => u.username).filter(Boolean));
+      suggestions.push(...users.map((u) => u.username).filter(Boolean));
     }
 
     if (!entityType || entityType === SearchEntityType.CONTRACT) {
@@ -482,7 +587,7 @@ export class SearchService {
         .select('contract.contractName')
         .limit(5)
         .getMany();
-      suggestions.push(...contracts.map(c => c.contractName).filter(Boolean));
+      suggestions.push(...contracts.map((c) => c.contractName).filter(Boolean));
     }
 
     return suggestions.slice(0, 10);
@@ -554,10 +659,10 @@ export class SearchService {
   private async initializeElasticsearchIndex(): Promise<void> {
     try {
       const entityTypes = Object.values(SearchEntityType);
-      
+
       for (const entityType of entityTypes) {
         const indexName = `stellara_${entityType}`;
-        
+
         try {
           await this.elasticsearchClient.indices.get({ index: indexName });
         } catch (error) {

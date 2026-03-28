@@ -1,0 +1,104 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: stellara-postgres
+  namespace: stellara-backend
+  labels:
+    app.kubernetes.io/name: stellara-postgres
+    app.kubernetes.io/component: database
+    app.kubernetes.io/part-of: stellara
+spec:
+  serviceName: stellara-postgres
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: stellara-postgres
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: stellara-postgres
+        app.kubernetes.io/component: database
+    spec:
+      containers:
+      - name: postgres
+        image: postgres:16-alpine
+        ports:
+        - containerPort: 5432
+          name: postgres
+        env:
+        - name: POSTGRES_USER
+          valueFrom:
+            secretKeyRef:
+              name: stellara-backend-secrets
+              key: DATABASE_USER
+        - name: POSTGRES_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: stellara-backend-secrets
+              key: DATABASE_PASSWORD
+        - name: POSTGRES_DB
+          value: "stellara_db"
+        - name: POSTGRES_INITDB_ARGS
+          value: "--encoding=UTF8"
+        - name: PGDATA
+          value: "/var/lib/postgresql/data/pgdata"
+        volumeMounts:
+        - name: postgres-data
+          mountPath: /var/lib/postgresql/data
+        - name: postgres-config
+          mountPath: /etc/postgresql/postgresql.conf
+          subPath: postgresql.conf
+        - name: wal-archive-script
+          mountPath: /usr/local/bin/wal-archive.sh
+          subPath: wal-archive.sh
+        - name: wal-restore-script
+          mountPath: /usr/local/bin/wal-restore.sh
+          subPath: wal-restore.sh
+        command:
+        - postgres
+        - -c
+        - config_file=/etc/postgresql/postgresql.conf
+        resources:
+          requests:
+            memory: "1Gi"
+            cpu: "500m"
+          limits:
+            memory: "2Gi"
+            cpu: "1000m"
+        livenessProbe:
+          exec:
+            command:
+            - pg_isready
+            - -U
+            - $(POSTGRES_USER)
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          exec:
+            command:
+            - pg_isready
+            - -U
+            - $(POSTGRES_USER)
+          initialDelaySeconds: 5
+          periodSeconds: 5
+      volumes:
+      - name: postgres-config
+        configMap:
+          name: stellara-postgres-config
+      - name: wal-archive-script
+        configMap:
+          name: stellara-postgres-scripts
+          defaultMode: 0755
+      - name: wal-restore-script
+        configMap:
+          name: stellara-postgres-scripts
+          defaultMode: 0755
+  volumeClaimTemplates:
+  - metadata:
+      name: postgres-data
+    spec:
+      accessModes: ["ReadWriteOnce"]
+      resources:
+        requests:
+          storage: 100Gi
+      storageClassName: fast-ssd  # Cloud-specific storage class

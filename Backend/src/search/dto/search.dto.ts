@@ -1,4 +1,12 @@
-import { IsString, IsOptional, IsArray, IsEnum, IsNumber, IsBoolean, IsObject } from 'class-validator';
+import {
+  IsString,
+  IsOptional,
+  IsArray,
+  IsEnum,
+  IsNumber,
+  IsBoolean,
+  IsObject,
+} from 'class-validator';
 import { Type } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
@@ -62,10 +70,10 @@ export class SearchQueryDto {
   @IsString()
   query: string;
 
-  @ApiPropertyOptional({ 
+  @ApiPropertyOptional({
     description: 'Entity types to search',
     enum: SearchEntityType,
-    isArray: true 
+    isArray: true,
   })
   @IsArray()
   @IsEnum(SearchEntityType, { each: true })
@@ -91,10 +99,10 @@ export class SearchQueryDto {
   @IsString()
   sortBy?: string = 'createdAt';
 
-  @ApiPropertyOptional({ 
+  @ApiPropertyOptional({
     description: 'Sort order',
     enum: SortOrder,
-    default: SortOrder.DESC 
+    default: SortOrder.DESC,
   })
   @IsEnum(SortOrder)
   sortOrder?: SortOrder = SortOrder.DESC;

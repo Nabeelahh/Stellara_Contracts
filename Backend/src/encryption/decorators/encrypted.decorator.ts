@@ -32,19 +32,19 @@ export function AutoEncrypt(options: EncryptedFieldOptions = {}) {
     // Process all properties with EncryptedField decorator
     for (const propertyKey in target.prototype) {
       const metadata = Reflect.getMetadata(ENCRYPTED_FIELD_KEY, target.prototype, propertyKey);
-      
+
       if (metadata && metadata.encrypt) {
         const originalDescriptor = Object.getOwnPropertyDescriptor(target.prototype, propertyKey);
-        
+
         if (originalDescriptor) {
           const { get, set } = originalDescriptor;
-          
+
           Object.defineProperty(target.prototype, propertyKey, {
-            get: function() {
+            get: function () {
               const value = get.call(this);
               return value; // Will be decrypted by interceptor
             },
-            set: function(value) {
+            set: function (value) {
               // Will be encrypted by interceptor
               set.call(this, value);
             },

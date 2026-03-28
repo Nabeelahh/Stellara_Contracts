@@ -1,0 +1,54 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: stellara-backend-ingress-gcp
+  namespace: stellara-backend
+  labels:
+    app.kubernetes.io/name: stellara-backend
+    app.kubernetes.io/component: ingress
+    app.kubernetes.io/part-of: stellara
+  annotations:
+    # Google Cloud Load Balancer annotations
+    kubernetes.io/ingress.class: gce
+    kubernetes.io/ingress.global-static-ip-name: stellara-backend-ip
+    networking.gke.io/managed-certificates: stellara-backend-cert
+    networking.gke.io/v1beta1.FrontendConfig: stellara-backend-frontend-config
+    kubernetes.io/ingress.allow-http: "false"
+    # Health checks
+    ingress.gcp.kubernetes.io/pre-shared-cert: "stellara-backend-cert"
+    # Multi-region routing
+    networking.gke.io/static-ip: stellara-backend-global-ip
+spec:
+  ingressClassName: gce
+  rules:
+  - host: api.stellara.io
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: stellara-backend
+            port:
+              number: 80
+
+---
+apiVersion: networking.gke.io/v1beta1
+kind: FrontendConfig
+metadata:
+  name: stellara-backend-frontend-config
+  namespace: stellara-backend
+spec:
+  redirectToHttps:
+    enabled: true
+  sslPolicy: gcp-cft-frontend-ssl-policy-2021-01
+
+---
+apiVersion: networking.gke.io/v1
+kind: ManagedCertificate
+metadata:
+  name: stellara-backend-cert
+  namespace: stellara-backend
+spec:
+  domains:
+  - api.stellara.io

@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { RedisService } from '../redis/redis.service';
+import { CacheWarmingService } from './cache-warming.service';
 
 type CacheStats = {
   l1Hits: number;
@@ -60,9 +61,14 @@ export class AdvancedCacheService {
   private readonly hotKeyAccess = new Map<string, { count: number; firstSeenAt: number }>();
   private readonly hotKeyWindowMs = Number(process.env.CACHE_HOTKEY_WINDOW_MS ?? 60_000);
   private readonly hotKeyThreshold = Number(process.env.CACHE_HOTKEY_THRESHOLD ?? 100);
-  private readonly hotKeyTtlBoostSeconds = Number(process.env.CACHE_HOTKEY_TTL_BOOST_SECONDS ?? 120);
+  private readonly hotKeyTtlBoostSeconds = Number(
+    process.env.CACHE_HOTKEY_TTL_BOOST_SECONDS ?? 120,
+  );
 
-  constructor(private readonly redisService: RedisService) {}
+  constructor(
+    private readonly redisService: RedisService,
+    private readonly warmingService: CacheWarmingService,
+  ) {}
 
   private l1TtlSeconds(options?: CacheOptions): number {
     return options?.ttlSeconds ?? this.defaultTtlSeconds;
@@ -73,7 +79,10 @@ export class AdvancedCacheService {
   }
 
   private cacheKey(baseKey: string, tags?: string[]): string {
-    const tagSuffix = (tags?.length ? tags.sort().join('|') : 'no-tags').replace(/[^a-zA-Z0-9:|_-]/g, '_');
+    const tagSuffix = (tags?.length ? tags.sort().join('|') : 'no-tags').replace(
+      /[^a-zA-Z0-9:|_-]/g,
+      '_',
+    );
     return `${this.schemaCacheVersion}:${tagSuffix}:${baseKey}`;
   }
 
@@ -187,6 +196,7 @@ export class AdvancedCacheService {
     const l1Value = this.getL1(effective);
     if (l1Value !== undefined) {
       this.stats.l1Hits += 1;
+      this.warmingService.recordAccess({ key: baseKey, timestamp: nowMs() });
       return l1Value as T;
     }
 
@@ -194,6 +204,7 @@ export class AdvancedCacheService {
     const inflight = this.inflight.get(effective);
     if (inflight) {
       this.stats.inflightCoalesced += 1;
+      this.warmingService.recordAccess({ key: baseKey, timestamp: nowMs() });
       return (await inflight) as T;
     }
 
@@ -201,6 +212,7 @@ export class AdvancedCacheService {
     const l2Raw = await redis.get(`cache:l2:${effective}`);
     if (l2Raw !== null && l2Raw !== undefined) {
       this.stats.l2Hits += 1;
+      this.warmingService.recordAccess({ key: baseKey, timestamp: nowMs() });
       try {
         const parsed = JSON.parse(l2Raw) as T;
         this.setL1(effective, parsed, ttlSeconds);
@@ -209,6 +221,7 @@ export class AdvancedCacheService {
         // fall through to fetcher
       }
     }
+    this.warmingService.recordAccess({ key: baseKey, timestamp: nowMs() });
 
     this.stats.misses += 1;
     const promise = fetcher()
@@ -240,7 +253,11 @@ export class AdvancedCacheService {
     return this.getOrSet(baseKey, fetcher, options, tags);
   }
 
-  async get<T>(baseKey: string, options: CacheOptions<T> = {}, tags: string[] = []): Promise<T | null> {
+  async get<T>(
+    baseKey: string,
+    options: CacheOptions<T> = {},
+    tags: string[] = [],
+  ): Promise<T | null> {
     const ttlSeconds = this.l1TtlSeconds(options);
     const effective = await this.effectiveKey(baseKey, tags);
 
@@ -264,7 +281,12 @@ export class AdvancedCacheService {
     }
   }
 
-  async set<T>(baseKey: string, value: T, options: CacheOptions<T> = {}, tags: string[] = []): Promise<void> {
+  async set<T>(
+    baseKey: string,
+    value: T,
+    options: CacheOptions<T> = {},
+    tags: string[] = [],
+  ): Promise<void> {
     const ttlSeconds = this.l1TtlSeconds(options);
     const effective = await this.effectiveKey(baseKey, tags);
     const redis = this.redisService.getClient();
@@ -312,4 +334,3 @@ export class AdvancedCacheService {
     return { ...this.stats, totalRequests, hitRate, evictionRate };
   }
 }
-

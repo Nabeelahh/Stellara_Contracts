@@ -20,7 +20,12 @@ import { Consent } from '../gdpr/entities/consent.entity';
 import { VoiceJob } from '../voice/entities/voice-job.entity';
 
 import { AuditService } from '../audit/audit.service';
-import { CreateExportDto, ExportStatusDto, DownloadExportDto, ExportListQueryDto } from './dto/data-export.dto';
+import {
+  CreateExportDto,
+  ExportStatusDto,
+  DownloadExportDto,
+  ExportListQueryDto,
+} from './dto/data-export.dto';
 
 @Injectable()
 export class DataExportService {
@@ -97,7 +102,10 @@ export class DataExportService {
     return exportJob;
   }
 
-  async downloadExport(userId: string, downloadDto: DownloadExportDto): Promise<{ downloadUrl: string; expiresAt: Date }> {
+  async downloadExport(
+    userId: string,
+    downloadDto: DownloadExportDto,
+  ): Promise<{ downloadUrl: string; expiresAt: Date }> {
     const exportJob = await this.exportJobRepository.findOne({
       where: { id: downloadDto.exportId, userId },
     });
@@ -107,7 +115,9 @@ export class DataExportService {
     }
 
     if (exportJob.status !== ExportStatus.COMPLETED) {
-      throw new BadRequestException(`Export is not ready for download. Current status: ${exportJob.status}`);
+      throw new BadRequestException(
+        `Export is not ready for download. Current status: ${exportJob.status}`,
+      );
     }
 
     if (exportJob.expiresAt && exportJob.expiresAt < new Date()) {
@@ -132,8 +142,12 @@ export class DataExportService {
     };
   }
 
-  async getUserExports(userId: string, query: ExportListQueryDto): Promise<{ exports: ExportJob[]; total: number }> {
-    const queryBuilder = this.exportJobRepository.createQueryBuilder('export')
+  async getUserExports(
+    userId: string,
+    query: ExportListQueryDto,
+  ): Promise<{ exports: ExportJob[]; total: number }> {
+    const queryBuilder = this.exportJobRepository
+      .createQueryBuilder('export')
       .where('export.userId = :userId', { userId });
 
     if (query.exportType) {
@@ -263,10 +277,12 @@ export class DataExportService {
       await this.exportJobRepository.save(exportJob);
 
       await this.sendCompletionNotification(exportJob);
-
     } catch (error) {
-      this.logger.error(`Export processing failed for job ${exportId}: ${error.message}`, error.stack);
-      
+      this.logger.error(
+        `Export processing failed for job ${exportId}: ${error.message}`,
+        error.stack,
+      );
+
       exportJob.status = ExportStatus.FAILED;
       exportJob.errorData = {
         message: error.message,
@@ -341,11 +357,14 @@ export class DataExportService {
   }
 
   private async exportTransactions(userId: string, filters: any): Promise<any> {
-    const queryBuilder = this.transactionRepository.createQueryBuilder('transaction')
+    const queryBuilder = this.transactionRepository
+      .createQueryBuilder('transaction')
       .where('transaction.userId = :userId', { userId });
 
     if (filters.startDate) {
-      queryBuilder.andWhere('transaction.createdAt >= :startDate', { startDate: filters.startDate });
+      queryBuilder.andWhere('transaction.createdAt >= :startDate', {
+        startDate: filters.startDate,
+      });
     }
 
     if (filters.endDate) {
@@ -366,7 +385,8 @@ export class DataExportService {
   }
 
   private async exportContracts(userId: string, filters: any): Promise<any> {
-    const queryBuilder = this.contractRepository.createQueryBuilder('contract')
+    const queryBuilder = this.contractRepository
+      .createQueryBuilder('contract')
       .where('contract.userId = :userId', { userId });
 
     if (filters.status) {
@@ -383,7 +403,8 @@ export class DataExportService {
   }
 
   private async exportWorkflows(userId: string, filters: any): Promise<any> {
-    const queryBuilder = this.workflowRepository.createQueryBuilder('workflow')
+    const queryBuilder = this.workflowRepository
+      .createQueryBuilder('workflow')
       .where('workflow.userId = :userId', { userId });
 
     if (filters.status) {
@@ -400,7 +421,8 @@ export class DataExportService {
   }
 
   private async exportAuditLogs(userId: string, filters: any): Promise<any> {
-    const queryBuilder = this.auditLogRepository.createQueryBuilder('audit')
+    const queryBuilder = this.auditLogRepository
+      .createQueryBuilder('audit')
       .where('audit.userId = :userId', { userId });
 
     if (filters.startDate) {
@@ -421,13 +443,7 @@ export class DataExportService {
   }
 
   private async exportAllUserData(userId: string, filters: any): Promise<any> {
-    const [
-      userData,
-      transactions,
-      contracts,
-      workflows,
-      auditLogs,
-    ] = await Promise.all([
+    const [userData, transactions, contracts, workflows, auditLogs] = await Promise.all([
       this.exportUserData(userId, filters),
       this.exportTransactions(userId, filters),
       this.exportContracts(userId, filters),
@@ -470,7 +486,8 @@ export class DataExportService {
       expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000).getTime(), // 24 hours
     };
 
-    return crypto.createHash('sha256')
+    return crypto
+      .createHash('sha256')
       .update(JSON.stringify(payload) + this.configService.get<string>('EXPORT_SECRET'))
       .digest('hex');
   }
@@ -487,7 +504,9 @@ export class DataExportService {
 
   private async sendFailureNotification(exportJob: ExportJob, error: Error): Promise<void> {
     // Email notification implementation would go here
-    this.logger.error(`Export ${exportJob.id} failed for user ${exportJob.userId}: ${error.message}`);
+    this.logger.error(
+      `Export ${exportJob.id} failed for user ${exportJob.userId}: ${error.message}`,
+    );
   }
 
   private async ensureExportDirectory(): Promise<void> {

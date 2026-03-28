@@ -18,13 +18,13 @@ import { AdvancedCacheModule } from '../cache/advanced-cache.module';
 @Module({
   imports: [
     TypeOrmModule.forFeature([
-      User, 
-      TransactionRecord, 
-      ContractMetadata, 
-      Workflow, 
-      AuditLog, 
-      Consent, 
-      VoiceJob
+      User,
+      TransactionRecord,
+      ContractMetadata,
+      Workflow,
+      AuditLog,
+      Consent,
+      VoiceJob,
     ]),
     ConfigModule,
     AuditModule,

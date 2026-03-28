@@ -59,9 +59,10 @@ export class ApiVersioningService {
     }
 
     // Update average response time
-    metrics.averageResponseTime = 
-      (metrics.averageResponseTime * (metrics.requestCount - 1) + responseTime) / metrics.requestCount;
-    
+    metrics.averageResponseTime =
+      (metrics.averageResponseTime * (metrics.requestCount - 1) + responseTime) /
+      metrics.requestCount;
+
     metrics.lastAccess = new Date();
 
     this.versionMetrics.set(version, metrics);
@@ -121,11 +122,15 @@ export class ApiVersioningService {
   }
 
   private generateUsageReport(): any {
-    const totalRequests = Array.from(this.versionMetrics.values())
-      .reduce((sum, metrics) => sum + metrics.requestCount, 0);
+    const totalRequests = Array.from(this.versionMetrics.values()).reduce(
+      (sum, metrics) => sum + metrics.requestCount,
+      0,
+    );
 
-    const totalErrors = Array.from(this.versionMetrics.values())
-      .reduce((sum, metrics) => sum + metrics.errorCount, 0);
+    const totalErrors = Array.from(this.versionMetrics.values()).reduce(
+      (sum, metrics) => sum + metrics.errorCount,
+      0,
+    );
 
     const versionUsage = Array.from(this.versionMetrics.entries()).map(([version, metrics]) => ({
       version,

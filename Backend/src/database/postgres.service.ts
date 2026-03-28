@@ -13,10 +13,7 @@ export class PostgresService implements OnApplicationShutdown {
       ? { connectionString }
       : {
           host: this.configService.get<string>('DATABASE_HOST', 'localhost'),
-          port: parseInt(
-            this.configService.get<string>('DATABASE_PORT', '5432'),
-            10,
-          ),
+          port: parseInt(this.configService.get<string>('DATABASE_PORT', '5432'), 10),
           user: this.configService.get<string>('DATABASE_USER', 'postgres'),
           password: this.configService.get<string>('DATABASE_PASSWORD', 'postgres'),
           database: this.configService.get<string>('DATABASE_NAME', 'app_db'),

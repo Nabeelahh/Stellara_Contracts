@@ -1,4 +1,15 @@
-import { Controller, Get, Post, Put, Delete, Param, Body, Headers, Deprecated, Version } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Put,
+  Delete,
+  Param,
+  Body,
+  Headers,
+  Deprecated,
+  Version,
+} from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiParam, ApiBody } from '@nestjs/swagger';
 import { UserService } from '../../user/user.service';
 import { CreateUserDto, UpdateUserDto, UserResponseDto } from './dto/user.dto';
@@ -70,10 +81,7 @@ export class UsersV1Controller {
   @ApiResponse({ status: 404, description: 'User not found' })
   @ApiResponse({ status: 410, description: 'API version deprecated' })
   @Deprecated({ since: '2024-01-01', reason: 'Use API v2 instead' })
-  async remove(
-    @Param('id') id: string,
-    @Headers() headers: Record<string, string>,
-  ): Promise<void> {
+  async remove(@Param('id') id: string, @Headers() headers: Record<string, string>): Promise<void> {
     return this.userService.remove(id);
   }
 }

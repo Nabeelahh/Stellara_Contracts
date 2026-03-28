@@ -15,7 +15,10 @@ export class CreateUserDtoV2 {
   @IsString()
   walletAddress: string;
 
-  @ApiProperty({ description: 'User profile data', example: { bio: 'Software developer', skills: ['JavaScript', 'TypeScript'] } })
+  @ApiProperty({
+    description: 'User profile data',
+    example: { bio: 'Software developer', skills: ['JavaScript', 'TypeScript'] },
+  })
   profileData: UserProfileV2;
 
   @ApiProperty({ description: 'User roles', example: ['USER'], isArray: true })
@@ -23,7 +26,10 @@ export class CreateUserDtoV2 {
   @IsString({ each: true })
   roles: string[];
 
-  @ApiPropertyOptional({ description: 'User preferences', example: { theme: 'dark', language: 'en' } })
+  @ApiPropertyOptional({
+    description: 'User preferences',
+    example: { theme: 'dark', language: 'en' },
+  })
   preferences?: UserPreferencesV2;
 }
 
@@ -43,7 +49,10 @@ export class UpdateUserDtoV2 {
   @IsOptional()
   walletAddress?: string;
 
-  @ApiPropertyOptional({ description: 'User profile data', example: { bio: 'Software developer', skills: ['JavaScript', 'TypeScript'] } })
+  @ApiPropertyOptional({
+    description: 'User profile data',
+    example: { bio: 'Software developer', skills: ['JavaScript', 'TypeScript'] },
+  })
   @IsOptional()
   profileData?: UserProfileV2;
 
@@ -53,7 +62,10 @@ export class UpdateUserDtoV2 {
   @IsOptional()
   roles?: string[];
 
-  @ApiPropertyOptional({ description: 'User preferences', example: { theme: 'dark', language: 'en' } })
+  @ApiPropertyOptional({
+    description: 'User preferences',
+    example: { theme: 'dark', language: 'en' },
+  })
   @IsOptional()
   preferences?: UserPreferencesV2;
 }
@@ -71,7 +83,10 @@ export class UserResponseDtoV2 {
   @ApiProperty({ description: 'User wallet address', example: 'GD5...' })
   walletAddress: string;
 
-  @ApiProperty({ description: 'User profile data', example: { bio: 'Software developer', skills: ['JavaScript', 'TypeScript'] } })
+  @ApiProperty({
+    description: 'User profile data',
+    example: { bio: 'Software developer', skills: ['JavaScript', 'TypeScript'] },
+  })
   profileData: UserProfileV2;
 
   @ApiProperty({ description: 'User reputation score', example: 750 })
@@ -83,7 +98,10 @@ export class UserResponseDtoV2 {
   @ApiProperty({ description: 'User roles', example: ['USER'], isArray: true })
   roles: string[];
 
-  @ApiPropertyOptional({ description: 'User preferences', example: { theme: 'dark', language: 'en' } })
+  @ApiPropertyOptional({
+    description: 'User preferences',
+    example: { theme: 'dark', language: 'en' },
+  })
   preferences?: UserPreferencesV2;
 
   @ApiProperty({ description: 'Account creation date', example: '2024-01-01T00:00:00.000Z' })
@@ -96,12 +114,19 @@ export class UserResponseDtoV2 {
 }
 
 export class UserProfileV2 {
-  @ApiPropertyOptional({ description: 'User biography', example: 'Software developer with 5 years experience' })
+  @ApiPropertyOptional({
+    description: 'User biography',
+    example: 'Software developer with 5 years experience',
+  })
   @IsString()
   @IsOptional()
   bio?: string;
 
-  @ApiProperty({ description: 'User skills', example: ['JavaScript', 'TypeScript', 'Node.js'], isArray: true })
+  @ApiProperty({
+    description: 'User skills',
+    example: ['JavaScript', 'TypeScript', 'Node.js'],
+    isArray: true,
+  })
   @IsArray()
   @IsString({ each: true })
   @IsOptional()

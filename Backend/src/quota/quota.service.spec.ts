@@ -93,7 +93,10 @@ describe('TenantQuotaService', () => {
           maxUsers: 10,
         }),
       },
-      user: { count: jest.fn().mockResolvedValue(2), findFirst: jest.fn().mockResolvedValue({ id: 'admin-1' }) },
+      user: {
+        count: jest.fn().mockResolvedValue(2),
+        findFirst: jest.fn().mockResolvedValue({ id: 'admin-1' }),
+      },
     };
     const service = new TenantQuotaService(
       prisma,
@@ -106,4 +109,3 @@ describe('TenantQuotaService', () => {
     expect(notify).toHaveBeenCalled();
   });
 });
-

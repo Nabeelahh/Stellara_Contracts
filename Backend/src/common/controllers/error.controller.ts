@@ -1,12 +1,4 @@
-import {
-  Controller,
-  Get,
-  Post,
-  Body,
-  HttpCode,
-  HttpStatus,
-  Headers,
-} from '@nestjs/common';
+import { Controller, Get, Post, Body, HttpCode, HttpStatus, Headers } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
 import { ConfigService } from '@nestjs/config';
 import { ERROR_CODES } from '../exceptions/error-codes';
@@ -27,57 +19,57 @@ export class ErrorController {
           validation: {
             range: '1000-1099',
             description: 'Validation and input errors',
-            codes: Object.keys(ERROR_CODES).filter(code => code.startsWith('E1')),
+            codes: Object.keys(ERROR_CODES).filter((code) => code.startsWith('E1')),
           },
           authentication: {
             range: '1100-1199',
             description: 'Authentication and authorization errors',
-            codes: Object.keys(ERROR_CODES).filter(code => code.startsWith('E1')),
+            codes: Object.keys(ERROR_CODES).filter((code) => code.startsWith('E1')),
           },
           authorization: {
             range: '1200-1299',
             description: 'Permission and access control errors',
-            codes: Object.keys(ERROR_CODES).filter(code => code.startsWith('E1')),
+            codes: Object.keys(ERROR_CODES).filter((code) => code.startsWith('E1')),
           },
           notFound: {
             range: '1300-1399',
             description: 'Resource not found errors',
-            codes: Object.keys(ERROR_CODES).filter(code => code.startsWith('E1')),
+            codes: Object.keys(ERROR_CODES).filter((code) => code.startsWith('E1')),
           },
           conflict: {
             range: '1400-1499',
             description: 'Resource conflict and state errors',
-            codes: Object.keys(ERROR_CODES).filter(code => code.startsWith('E1')),
+            codes: Object.keys(ERROR_CODES).filter((code) => code.startsWith('E1')),
           },
           rateLimit: {
             range: '1500-1599',
             description: 'Rate limiting and throttling errors',
-            codes: Object.keys(ERROR_CODES).filter(code => code.startsWith('E1')),
+            codes: Object.keys(ERROR_CODES).filter((code) => code.startsWith('E1')),
           },
           businessLogic: {
             range: '1600-1699',
             description: 'Business logic and domain errors',
-            codes: Object.keys(ERROR_CODES).filter(code => code.startsWith('E1')),
+            codes: Object.keys(ERROR_CODES).filter((code) => code.startsWith('E1')),
           },
           database: {
             range: '1700-1799',
             description: 'Database and persistence errors',
-            codes: Object.keys(ERROR_CODES).filter(code => code.startsWith('E1')),
+            codes: Object.keys(ERROR_CODES).filter((code) => code.startsWith('E1')),
           },
           external: {
             range: '1800-1899',
             description: 'External service and integration errors',
-            codes: Object.keys(ERROR_CODES).filter(code => code.startsWith('E1')),
+            codes: Object.keys(ERROR_CODES).filter((code) => code.startsWith('E1')),
           },
           system: {
             range: '1900-1999',
             description: 'System and infrastructure errors',
-            codes: Object.keys(ERROR_CODES).filter(code => code.startsWith('E1')),
+            codes: Object.keys(ERROR_CODES).filter((code) => code.startsWith('E1')),
           },
           security: {
             range: '2000-2099',
             description: 'Security and attack detection errors',
-            codes: Object.keys(ERROR_CODES).filter(code => code.startsWith('E2')),
+            codes: Object.keys(ERROR_CODES).filter((code) => code.startsWith('E2')),
           },
         },
         codes: ERROR_CODES,
@@ -91,7 +83,7 @@ export class ErrorController {
   @ApiResponse({ status: 200, description: 'Error handling system health' })
   getHealthStatus(): any {
     const isDevelopment = this.configService.get('NODE_ENV') !== 'production';
-    
+
     return {
       success: true,
       data: {
@@ -186,12 +178,12 @@ export class ErrorController {
 
   private getErrorMessages(): Record<string, string> {
     const messages: Record<string, string> = {};
-    
+
     // Map all error codes to messages
     Object.entries(ERROR_CODES).forEach(([code, message]) => {
       messages[code] = message;
     });
-    
+
     return messages;
   }
 }

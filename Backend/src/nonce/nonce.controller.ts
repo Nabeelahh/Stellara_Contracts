@@ -9,14 +9,15 @@ export class NonceController {
   constructor(private readonly nonceService: NonceService) {}
 
   @Post()
-  @ApiOperation({ 
+  @ApiOperation({
     summary: 'Generate nonce',
-    description: 'Generates a unique nonce for transaction signing. Used to prevent replay attacks.'
+    description:
+      'Generates a unique nonce for transaction signing. Used to prevent replay attacks.',
   })
-  @ApiResponse({ 
-    status: 201, 
+  @ApiResponse({
+    status: 201,
     description: 'Nonce generated successfully',
-    type: NonceResponseDto 
+    type: NonceResponseDto,
   })
   async getNonce(): Promise<NonceResponseDto> {
     return { nonce: await this.nonceService.generateNonce() };

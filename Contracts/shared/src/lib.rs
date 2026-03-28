@@ -10,6 +10,7 @@ pub struct ContractConfig {
     pub is_paused: bool,
 }
 
+pub mod acl;
 pub mod fees;
 pub mod governance;
 

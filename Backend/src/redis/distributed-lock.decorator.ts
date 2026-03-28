@@ -78,9 +78,7 @@ function resolvePlaceholderValue(
     return String(context.args[0]);
   }
 
-  throw new Error(
-    `Unable to resolve lock placeholder {${placeholder}} for ${context.methodName}.`,
-  );
+  throw new Error(`Unable to resolve lock placeholder {${placeholder}} for ${context.methodName}.`);
 }
 
 export function resolveDistributedLockKeys(
@@ -94,13 +92,7 @@ export function resolveDistributedLockKeys(
     ),
   );
 
-  const normalizedKeys = Array.from(
-    new Set(
-      keys
-        .map((key) => key.trim())
-        .filter(Boolean),
-    ),
-  );
+  const normalizedKeys = Array.from(new Set(keys.map((key) => key.trim()).filter(Boolean)));
 
   if (!normalizedKeys.length) {
     throw new Error(`No distributed lock keys were resolved for ${context.methodName}.`);

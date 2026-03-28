@@ -1,0 +1,160 @@
+test	Check Formatting	﻿2026-03-26T20:25:05.0138692Z ##[group]Run cd Contracts && cargo fmt --all -- --check
+test	Check Formatting	2026-03-26T20:25:05.0139104Z [36;1mcd Contracts && cargo fmt --all -- --check[0m
+test	Check Formatting	2026-03-26T20:25:05.0194133Z shell: /usr/bin/bash -e {0}
+test	Check Formatting	2026-03-26T20:25:05.0194412Z env:
+test	Check Formatting	2026-03-26T20:25:05.0194595Z   CARGO_HOME: /home/runner/.cargo
+test	Check Formatting	2026-03-26T20:25:05.0194852Z   CARGO_INCREMENTAL: 0
+test	Check Formatting	2026-03-26T20:25:05.0195062Z   CARGO_TERM_COLOR: always
+test	Check Formatting	2026-03-26T20:25:05.0195283Z ##[endgroup]
+test	Check Formatting	2026-03-26T20:25:05.1908201Z Diff in /home/runner/work/Stellara_Contracts/Stellara_Contracts/Contracts/contracts/staking-rewards/src/lib.rs:61:
+test	Check Formatting	2026-03-26T20:25:05.1909437Z          }
+test	Check Formatting	2026-03-26T20:25:05.1909683Z  
+test	Check Formatting	2026-03-26T20:25:05.1915104Z          env.storage().instance().set(&storage_keys::ADMIN, &admin);
+test	Check Formatting	2026-03-26T20:25:05.1915886Z -        env.storage().instance().set(&storage_keys::STAKE_TOKEN, &staking_token);
+test	Check Formatting	2026-03-26T20:25:05.1916925Z -        env.storage().instance().set(&storage_keys::REWARD_TOKEN, &reward_token);
+test	Check Formatting	2026-03-26T20:25:05.1917578Z +        env.storage()
+test	Check Formatting	2026-03-26T20:25:05.1918112Z +            .instance()
+test	Check Formatting	2026-03-26T20:25:05.1918724Z +            .set(&storage_keys::STAKE_TOKEN, &staking_token);
+test	Check Formatting	2026-03-26T20:25:05.1919408Z +        env.storage()
+test	Check Formatting	2026-03-26T20:25:05.1919863Z +            .instance()
+test	Check Formatting	2026-03-26T20:25:05.1920230Z +            .set(&storage_keys::REWARD_TOKEN, &reward_token);
+test	Check Formatting	2026-03-26T20:25:05.1920621Z  
+test	Check Formatting	2026-03-26T20:25:05.1920876Z          // Define default pools: 30, 60, 90 days
+test	Check Formatting	2026-03-26T20:25:05.1921285Z          let pools = soroban_sdk::vec![
+test	Check Formatting	2026-03-26T20:25:05.1922020Z Diff in /home/runner/work/Stellara_Contracts/Stellara_Contracts/Contracts/contracts/staking-rewards/src/lib.rs:80:
+test	Check Formatting	2026-03-26T20:25:05.1922762Z                  apy_bps: 1500, // 15%
+test	Check Formatting	2026-03-26T20:25:05.1923080Z              },
+test	Check Formatting	2026-03-26T20:25:05.1923304Z          ];
+test	Check Formatting	2026-03-26T20:25:05.1923674Z -        env.storage().instance().set(&storage_keys::POOL_CONFIG, &pools);
+test	Check Formatting	2026-03-26T20:25:05.1924152Z +        env.storage()
+test	Check Formatting	2026-03-26T20:25:05.1924419Z +            .instance()
+test	Check Formatting	2026-03-26T20:25:05.1924749Z +            .set(&storage_keys::POOL_CONFIG, &pools);
+test	Check Formatting	2026-03-26T20:25:05.1925113Z  
+test	Check Formatting	2026-03-26T20:25:05.1925321Z          Ok(())
+test	Check Formatting	2026-03-26T20:25:05.1925550Z      }
+test	Check Formatting	2026-03-26T20:25:05.1926167Z Diff in /home/runner/work/Stellara_Contracts/Stellara_Contracts/Contracts/contracts/staking-rewards/src/lib.rs:206:
+test	Check Formatting	2026-03-26T20:25:05.1927099Z              let penalty_bps = 1000; // 10% penalty
+test	Check Formatting	2026-03-26T20:25:05.1927499Z              let penalty_amount = (principal_to_return * penalty_bps as i128) / 10000;
+test	Check Formatting	2026-03-26T20:25:05.1927930Z              principal_to_return -= penalty_amount;
+test	Check Formatting	2026-03-26T20:25:05.1928196Z -            
+test	Check Formatting	2026-03-26T20:25:05.1928355Z +
+test	Check Formatting	2026-03-26T20:25:05.1928600Z              // Penalty stays in the contract (could be sent to a treasury)
+test	Check Formatting	2026-03-26T20:25:05.1928916Z          }
+test	Check Formatting	2026-03-26T20:25:05.1929071Z  
+test	Check Formatting	2026-03-26T20:25:05.1929485Z Diff in /home/runner/work/Stellara_Contracts/Stellara_Contracts/Contracts/contracts/staking-rewards/src/lib.rs:247:
+test	Check Formatting	2026-03-26T20:25:05.1929997Z          }
+test	Check Formatting	2026-03-26T20:25:05.1930212Z  
+test	Check Formatting	2026-03-26T20:25:05.1930496Z          // Logic check: reward token must be the same as staking token for auto-compound
+test	Check Formatting	2026-03-26T20:25:05.1931379Z -        let staking_token: Address = env.storage().instance().get(&storage_keys::STAKE_TOKEN).unwrap();
+test	Check Formatting	2026-03-26T20:25:05.1932006Z -        let reward_token: Address = env.storage().instance().get(&storage_keys::REWARD_TOKEN).unwrap();
+test	Check Formatting	2026-03-26T20:25:05.1932419Z -        
+test	Check Formatting	2026-03-26T20:25:05.1932599Z +        let staking_token: Address = env
+test	Check Formatting	2026-03-26T20:25:05.1932841Z +            .storage()
+test	Check Formatting	2026-03-26T20:25:05.1933037Z +            .instance()
+test	Check Formatting	2026-03-26T20:25:05.1933262Z +            .get(&storage_keys::STAKE_TOKEN)
+test	Check Formatting	2026-03-26T20:25:05.1933506Z +            .unwrap();
+test	Check Formatting	2026-03-26T20:25:05.1933705Z +        let reward_token: Address = env
+test	Check Formatting	2026-03-26T20:25:05.1933943Z +            .storage()
+test	Check Formatting	2026-03-26T20:25:05.1934120Z +            .instance()
+test	Check Formatting	2026-03-26T20:25:05.1934351Z +            .get(&storage_keys::REWARD_TOKEN)
+test	Check Formatting	2026-03-26T20:25:05.1934836Z +            .unwrap();
+test	Check Formatting	2026-03-26T20:25:05.1935018Z +
+test	Check Formatting	2026-03-26T20:25:05.1935194Z          if staking_token != reward_token {
+test	Check Formatting	2026-03-26T20:25:05.1935564Z              return Err(ContractError::Unauthorized); // Or a more specific error
+test	Check Formatting	2026-03-26T20:25:05.1935927Z          }
+test	Check Formatting	2026-03-26T20:25:05.1936372Z Diff in /home/runner/work/Stellara_Contracts/Stellara_Contracts/Contracts/contracts/staking-rewards/src/lib.rs:276:
+test	Check Formatting	2026-03-26T20:25:05.1937117Z      pub fn get_pending_rewards(env: Env, user: Address) -> i128 {
+test	Check Formatting	2026-03-26T20:25:05.1937465Z          let key = (storage_keys::USER_STAKE, user);
+test	Check Formatting	2026-03-26T20:25:05.1937863Z          if let Some(user_stake) = env.storage().persistent().get::<_, UserStake>(&key) {
+test	Check Formatting	2026-03-26T20:25:05.1938333Z -           return calculate_rewards(&env, &user_stake).unwrap_or(0);
+test	Check Formatting	2026-03-26T20:25:05.1938727Z +            return calculate_rewards(&env, &user_stake).unwrap_or(0);
+test	Check Formatting	2026-03-26T20:25:05.1939033Z          }
+test	Check Formatting	2026-03-26T20:25:05.1939187Z          0
+test	Check Formatting	2026-03-26T20:25:05.1939337Z      }
+test	Check Formatting	2026-03-26T20:25:05.1939753Z Diff in /home/runner/work/Stellara_Contracts/Stellara_Contracts/Contracts/contracts/staking-rewards/src/lib.rs:304:
+test	Check Formatting	2026-03-26T20:25:05.1940329Z      // Reward = Principal * APY * (elapsed / seconds_in_year)
+test	Check Formatting	2026-03-26T20:25:05.1940640Z      // APY is in basis points
+test	Check Formatting	2026-03-26T20:25:05.1940882Z      let seconds_in_year: u64 = 365 * 24 * 60 * 60;
+test	Check Formatting	2026-03-26T20:25:05.1941140Z -    
+test	Check Formatting	2026-03-26T20:25:05.1941289Z +
+test	Check Formatting	2026-03-26T20:25:05.1941598Z      // Scale precision for calculation: (amount * apy * seconds) / (10000 * seconds_in_year)
+test	Check Formatting	2026-03-26T20:25:05.1942071Z      // Using i128 to prevent overflow in Intermediate calculation
+test	Check Formatting	2026-03-26T20:25:05.1942523Z -    let reward = (user_stake.amount * pool.apy_bps as i128 * elapsed_seconds as i128) 
+test	Check Formatting	2026-03-26T20:25:05.1942935Z -                 / (10000i128 * seconds_in_year as i128);
+test	Check Formatting	2026-03-26T20:25:05.1943329Z +    let reward = (user_stake.amount * pool.apy_bps as i128 * elapsed_seconds as i128)
+test	Check Formatting	2026-03-26T20:25:05.1943727Z +        / (10000i128 * seconds_in_year as i128);
+test	Check Formatting	2026-03-26T20:25:05.1943967Z  
+test	Check Formatting	2026-03-26T20:25:05.1944116Z      Ok(reward)
+test	Check Formatting	2026-03-26T20:25:05.1944284Z  }
+test	Check Formatting	2026-03-26T20:25:05.1944697Z Diff in /home/runner/work/Stellara_Contracts/Stellara_Contracts/Contracts/contracts/staking-rewards/src/test.rs:1:
+test	Check Formatting	2026-03-26T20:25:05.1945183Z  #![cfg(test)]
+test	Check Formatting	2026-03-26T20:25:05.1945349Z  
+test	Check Formatting	2026-03-26T20:25:05.1945495Z  use super::*;
+test	Check Formatting	2026-03-26T20:25:05.1945777Z -use soroban_sdk::{testutils::{Address as _, Ledger}, Address, Env, Vec};
+test	Check Formatting	2026-03-26T20:25:05.1946244Z  use soroban_sdk::token::{Client as TokenClient, StellarAssetClient};
+test	Check Formatting	2026-03-26T20:25:05.1946688Z +use soroban_sdk::{
+test	Check Formatting	2026-03-26T20:25:05.1946895Z +    testutils::{Address as _, Ledger},
+test	Check Formatting	2026-03-26T20:25:05.1947132Z +    Address, Env, Vec,
+test	Check Formatting	2026-03-26T20:25:05.1947322Z +};
+test	Check Formatting	2026-03-26T20:25:05.1947462Z  
+test	Check Formatting	2026-03-26T20:25:05.1947841Z -fn create_token(env: &Env, admin: &Address) -> (Address, TokenClient<'static>, StellarAssetClient<'static>) {
+test	Check Formatting	2026-03-26T20:25:05.1948307Z +fn create_token(
+test	Check Formatting	2026-03-26T20:25:05.1948483Z +    env: &Env,
+test	Check Formatting	2026-03-26T20:25:05.1948650Z +    admin: &Address,
+test	Check Formatting	2026-03-26T20:25:05.1949058Z +) -> (Address, TokenClient<'static>, StellarAssetClient<'static>) {
+test	Check Formatting	2026-03-26T20:25:05.1949474Z      let address = env.register_stellar_asset_contract(admin.clone());
+test	Check Formatting	2026-03-26T20:25:05.1949957Z -    (address.clone(), TokenClient::new(env, &address), StellarAssetClient::new(env, &address))
+test	Check Formatting	2026-03-26T20:25:05.1950356Z +    (
+test	Check Formatting	2026-03-26T20:25:05.1950515Z +        address.clone(),
+test	Check Formatting	2026-03-26T20:25:05.1950732Z +        TokenClient::new(env, &address),
+test	Check Formatting	2026-03-26T20:25:05.1951004Z +        StellarAssetClient::new(env, &address),
+test	Check Formatting	2026-03-26T20:25:05.1951251Z +    )
+test	Check Formatting	2026-03-26T20:25:05.1951391Z  }
+test	Check Formatting	2026-03-26T20:25:05.1951532Z  
+test	Check Formatting	2026-03-26T20:25:05.1951676Z  #[test]
+test	Check Formatting	2026-03-26T20:25:05.1952091Z Diff in /home/runner/work/Stellara_Contracts/Stellara_Contracts/Contracts/contracts/staking-rewards/src/test.rs:16:
+test	Check Formatting	2026-03-26T20:25:05.1952727Z  
+test	Check Formatting	2026-03-26T20:25:05.1952891Z      let admin = Address::generate(&env);
+test	Check Formatting	2026-03-26T20:25:05.1953147Z      let user = Address::generate(&env);
+test	Check Formatting	2026-03-26T20:25:05.1953377Z -    
+test	Check Formatting	2026-03-26T20:25:05.1953524Z +
+test	Check Formatting	2026-03-26T20:25:05.1953670Z      // Create tokens
+test	Check Formatting	2026-03-26T20:25:05.1954035Z      let (staking_token_address, staking_token, staking_token_admin) = create_token(&env, &admin);
+test	Check Formatting	2026-03-26T20:25:05.1954607Z      let (reward_token_address, reward_token, reward_token_admin) = create_token(&env, &admin);
+test	Check Formatting	2026-03-26T20:25:05.1955265Z Diff in /home/runner/work/Stellara_Contracts/Stellara_Contracts/Contracts/contracts/staking-rewards/src/test.rs:34:
+test	Check Formatting	2026-03-26T20:25:05.1955755Z  
+test	Check Formatting	2026-03-26T20:25:05.1955937Z      // User stakes 1000 in pool 0 (30 days, 5% APY)
+test	Check Formatting	2026-03-26T20:25:05.1956228Z      client.stake(&user, &1000, &0);
+test	Check Formatting	2026-03-26T20:25:05.1956446Z -    
+test	Check Formatting	2026-03-26T20:25:05.1956868Z +
+test	Check Formatting	2026-03-26T20:25:05.1957068Z      assert_eq!(staking_token.balance(&user), 9000);
+test	Check Formatting	2026-03-26T20:25:05.1957411Z      assert_eq!(staking_token.balance(&contract_id), 1000);
+test	Check Formatting	2026-03-26T20:25:05.1957693Z  
+test	Check Formatting	2026-03-26T20:25:05.1958096Z Diff in /home/runner/work/Stellara_Contracts/Stellara_Contracts/Contracts/contracts/staking-rewards/src/test.rs:86:
+test	Check Formatting	2026-03-26T20:25:05.1958591Z  
+test	Check Formatting	2026-03-26T20:25:05.1958758Z      let admin = Address::generate(&env);
+test	Check Formatting	2026-03-26T20:25:05.1959014Z      let user = Address::generate(&env);
+test	Check Formatting	2026-03-26T20:25:05.1959237Z -    
+test	Check Formatting	2026-03-26T20:25:05.1959407Z +
+test	Check Formatting	2026-03-26T20:25:05.1959788Z      let (staking_token_address, _staking_token, staking_token_admin) = create_token(&env, &admin);
+test	Check Formatting	2026-03-26T20:25:05.1960361Z      let (reward_token_address, _reward_token, _reward_token_admin) = create_token(&env, &admin);
+test	Check Formatting	2026-03-26T20:25:05.1960756Z  
+test	Check Formatting	2026-03-26T20:25:05.1961167Z Diff in /home/runner/work/Stellara_Contracts/Stellara_Contracts/Contracts/contracts/staking-rewards/src/test.rs:122:
+test	Check Formatting	2026-03-26T20:25:05.1961654Z  
+test	Check Formatting	2026-03-26T20:25:05.1961823Z      let admin = Address::generate(&env);
+test	Check Formatting	2026-03-26T20:25:05.1962080Z      let user = Address::generate(&env);
+test	Check Formatting	2026-03-26T20:25:05.1962307Z -    
+test	Check Formatting	2026-03-26T20:25:05.1962452Z +
+test	Check Formatting	2026-03-26T20:25:05.1962714Z      // In compounding test, staking token and reward token MUST be the same
+test	Check Formatting	2026-03-26T20:25:05.1963161Z      let (token_address, token, token_admin) = create_token(&env, &admin);
+test	Check Formatting	2026-03-26T20:25:05.1963488Z  
+test	Check Formatting	2026-03-26T20:25:05.1963903Z Diff in /home/runner/work/Stellara_Contracts/Stellara_Contracts/Contracts/contracts/staking-rewards/src/test.rs:152:
+test	Check Formatting	2026-03-26T20:25:05.1964390Z  
+test	Check Formatting	2026-03-26T20:25:05.1964546Z      // Compound
+test	Check Formatting	2026-03-26T20:25:05.1964725Z      client.compound(&user);
+test	Check Formatting	2026-03-26T20:25:05.1964928Z -    
+test	Check Formatting	2026-03-26T20:25:05.1965073Z +
+test	Check Formatting	2026-03-26T20:25:05.1965272Z      let stake_info = client.get_stake(&user).unwrap();
+test	Check Formatting	2026-03-26T20:25:05.1965556Z      assert_eq!(stake_info.amount, 1073);
+test	Check Formatting	2026-03-26T20:25:05.1965817Z      assert_eq!(token.balance(&user), 0);
+test	Check Formatting	2026-03-26T20:25:05.2112605Z ##[error]Process completed with exit code 1.

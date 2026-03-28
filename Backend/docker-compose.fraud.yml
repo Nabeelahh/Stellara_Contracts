@@ -1,0 +1,15 @@
+version: '3.8'
+services:
+  fraud-model:
+    build: ./fraud-model
+    image: stellara/fraud-model:local
+    ports:
+      - "4000:4000"
+    volumes:
+      - ./fraud-model/models:/models:ro
+
+  fraud-scorer:
+    build: ./fraud-scorer
+    image: stellara/fraud-scorer:local
+    ports:
+      - "3001:3001"

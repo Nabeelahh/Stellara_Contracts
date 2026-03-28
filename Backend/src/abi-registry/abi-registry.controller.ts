@@ -1,13 +1,4 @@
-import {
-  Body,
-  Controller,
-  Get,
-  Param,
-  Post,
-  Query,
-  Request,
-  UseGuards,
-} from '@nestjs/common';
+import { Body, Controller, Get, Param, Post, Query, Request, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Role } from '@prisma/client';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -34,10 +25,7 @@ export class AbiRegistryController {
 
   @Get('contracts/:address')
   @ApiOperation({ summary: 'Get the active or requested ABI version for a contract' })
-  async getRegistry(
-    @Param('address') address: string,
-    @Query('version') version?: string,
-  ) {
+  async getRegistry(@Param('address') address: string, @Query('version') version?: string) {
     return this.abiRegistryService.getRegistry(address, version);
   }
 
@@ -52,28 +40,19 @@ export class AbiRegistryController {
 
   @Post('contracts/:address/invocations/prepare')
   @ApiOperation({ summary: 'Prepare a dynamic contract invocation from ABI metadata' })
-  async prepareInvocation(
-    @Param('address') address: string,
-    @Body() dto: PrepareInvocationDto,
-  ) {
+  async prepareInvocation(@Param('address') address: string, @Body() dto: PrepareInvocationDto) {
     return this.abiRegistryService.prepareInvocation(address, dto);
   }
 
   @Post('contracts/:address/decode-result')
   @ApiOperation({ summary: 'Decode a contract function result using ABI metadata' })
-  async decodeResult(
-    @Param('address') address: string,
-    @Body() dto: DecodeContractResultDto,
-  ) {
+  async decodeResult(@Param('address') address: string, @Body() dto: DecodeContractResultDto) {
     return this.abiRegistryService.decodeContractResult(address, dto);
   }
 
   @Post('contracts/:address/parse-event')
   @ApiOperation({ summary: 'Parse a Soroban event using the ABI registry' })
-  async parseEvent(
-    @Param('address') address: string,
-    @Body() dto: ParseContractEventDto,
-  ) {
+  async parseEvent(@Param('address') address: string, @Body() dto: ParseContractEventDto) {
     return this.abiRegistryService.parseContractEvent(address, dto);
   }
 }

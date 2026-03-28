@@ -16,10 +16,10 @@ export class UserThrottlerGuard implements CanActivate {
       return true;
     }
 
-    const skipRateLimit = this.reflector.getAllAndOverride<boolean>(
-      SKIP_RATE_LIMIT,
-      [context.getHandler(), context.getClass()],
-    );
+    const skipRateLimit = this.reflector.getAllAndOverride<boolean>(SKIP_RATE_LIMIT, [
+      context.getHandler(),
+      context.getClass(),
+    ]);
 
     if (skipRateLimit) {
       return true;

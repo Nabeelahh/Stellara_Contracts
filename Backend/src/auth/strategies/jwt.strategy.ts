@@ -46,11 +46,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     }
 
     if (payload.sid) {
-      await this.sessionService.validateAccessSession(
-        payload.sub,
-        payload.sid,
-        request,
-      );
+      await this.sessionService.validateAccessSession(payload.sub, payload.sid, request);
     }
 
     return {

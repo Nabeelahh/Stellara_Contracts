@@ -2,14 +2,14 @@ import { StructuredLoggerService } from '../services/structured-logger.service';
 
 /**
  * Decorator to inject a logger into a class with the class name as context
- * 
+ *
  * Usage:
  * ```
  * @Injectable()
  * @WithLogger()
  * export class MyService {
  *   constructor(private readonly logger: StructuredLoggerService) {}
- * 
+ *
  *   myMethod() {
  *     this.logger.log('Hello from MyService');
  *   }
@@ -24,20 +24,18 @@ export function WithLogger() {
       constructor(...args: any[]) {
         super(...args);
         // Try to get logger from injected services
-        const loggerIndex = args.findIndex(
-          arg => arg instanceof StructuredLoggerService
-        );
-        
+        const loggerIndex = args.findIndex((arg) => arg instanceof StructuredLoggerService);
+
         if (loggerIndex !== -1) {
           this.logger = args[loggerIndex];
         } else {
           // Create a new logger instance if none found
           // This will be properly configured when the service is instantiated
           this.logger = args.find(
-            arg => arg?.constructor?.name === 'StructuredLoggerService'
+            (arg) => arg?.constructor?.name === 'StructuredLoggerService',
           ) as StructuredLoggerService;
         }
-        
+
         if (this.logger) {
           this.logger.setContext(constructor.name);
         }
@@ -49,18 +47,16 @@ export function WithLogger() {
 /**
  * Method decorator to log method entry and exit with timing
  */
-export function LogMethod(options: { 
-  level?: 'debug' | 'info' | 'log';
-  logArgs?: boolean;
-  logResult?: boolean;
-} = {}) {
+export function LogMethod(
+  options: {
+    level?: 'debug' | 'info' | 'log';
+    logArgs?: boolean;
+    logResult?: boolean;
+  } = {},
+) {
   const { level = 'debug', logArgs = false, logResult = false } = options;
-  
-  return function (
-    target: any,
-    propertyKey: string,
-    descriptor: PropertyDescriptor
-  ) {
+
+  return function (target: any, propertyKey: string, descriptor: PropertyDescriptor) {
     const originalMethod = descriptor.value;
     const className = target.constructor.name;
 
@@ -91,11 +87,11 @@ export function LogMethod(options: {
             method: `${className}.${propertyKey}`,
             durationMs: duration,
           };
-          
+
           if (logResult) {
             exitLogData.result = result;
           }
-          
+
           logger[level]?.call(logger, `Exiting ${className}.${propertyKey}`, exitLogData);
         }
 
@@ -105,14 +101,19 @@ export function LogMethod(options: {
         const duration = endTime - startTime;
 
         if (logger) {
-          logger.error?.call(logger, `Error in ${className}.${propertyKey}: ${error.message}`, error.stack, {
-            method: `${className}.${propertyKey}`,
-            durationMs: duration,
-            error: {
-              name: error.name,
-              message: error.message,
+          logger.error?.call(
+            logger,
+            `Error in ${className}.${propertyKey}: ${error.message}`,
+            error.stack,
+            {
+              method: `${className}.${propertyKey}`,
+              durationMs: duration,
+              error: {
+                name: error.name,
+                message: error.message,
+              },
             },
-          });
+          );
         }
 
         throw error;
@@ -127,11 +128,7 @@ export function LogMethod(options: {
  * Method decorator to trace method execution with performance metrics
  */
 export function Trace(operationName?: string) {
-  return function (
-    target: any,
-    propertyKey: string,
-    descriptor: PropertyDescriptor
-  ) {
+  return function (target: any, propertyKey: string, descriptor: PropertyDescriptor) {
     const originalMethod = descriptor.value;
     const className = target.constructor.name;
     const name = operationName || `${className}.${propertyKey}`;

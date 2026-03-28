@@ -1,12 +1,24 @@
-import { Injectable, Logger, NotFoundException, BadRequestException, ForbiddenException } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+  NotFoundException,
+  BadRequestException,
+  ForbiddenException,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, DataSource, SelectQueryBuilder } from 'typeorm';
 import { JwtService } from '@nestjs/jwt';
 
 import { User } from '../auth/entities/user.entity';
-import { TransactionRecord, TransactionStatus } from '../contract-interaction/entities/transaction-record.entity';
-import { ContractMetadata, ContractStatus } from '../contract-interaction/entities/contract-metadata.entity';
+import {
+  TransactionRecord,
+  TransactionStatus,
+} from '../contract-interaction/entities/transaction-record.entity';
+import {
+  ContractMetadata,
+  ContractStatus,
+} from '../contract-interaction/entities/contract-metadata.entity';
 import { Workflow } from '../workflow/entities/workflow.entity';
 import { AuditLog } from '../audit/audit.entity';
 import { Consent } from '../gdpr/entities/consent.entity';
@@ -57,15 +69,20 @@ export class AdminService {
     private readonly cache: AdvancedCacheService,
   ) {}
 
-  async getUsers(filter: UserFilterDto, page = 1, limit = 20): Promise<{ users: User[]; total: number }> {
-    const queryBuilder = this.userRepository.createQueryBuilder('user')
+  async getUsers(
+    filter: UserFilterDto,
+    page = 1,
+    limit = 20,
+  ): Promise<{ users: User[]; total: number }> {
+    const queryBuilder = this.userRepository
+      .createQueryBuilder('user')
       .leftJoinAndSelect('user.walletBindings', 'walletBindings')
       .leftJoinAndSelect('user.refreshTokens', 'refreshTokens');
 
     if (filter.search) {
       queryBuilder.where(
         '(user.username ILIKE :search OR user.email ILIKE :search OR user.id ILIKE :search)',
-        { search: `%${filter.search}%` }
+        { search: `%${filter.search}%` },
       );
     }
 
@@ -97,7 +114,11 @@ export class AdminService {
     return { users, total };
   }
 
-  async updateUser(userId: string, updateData: UserManagementDto, adminUserId: string): Promise<User> {
+  async updateUser(
+    userId: string,
+    updateData: UserManagementDto,
+    adminUserId: string,
+  ): Promise<User> {
     const user = await this.userRepository.findOne({ where: { id: userId } });
     if (!user) {
       throw new NotFoundException(`User ${userId} not found`);
@@ -111,11 +132,11 @@ export class AdminService {
       userId: adminUserId,
       action: 'USER_UPDATE',
       resource: `User:${userId}`,
-      details: { 
-        previousStatus, 
-        newStatus: user.status, 
+      details: {
+        previousStatus,
+        newStatus: user.status,
         updateData,
-        impersonatedUserId: userId 
+        impersonatedUserId: userId,
       },
     });
 
@@ -130,8 +151,13 @@ export class AdminService {
     return await this.updateUser(userId, { status: UserStatus.ACTIVE }, adminUserId);
   }
 
-  async impersonateUser(impersonationDto: ImpersonationDto, adminUserId: string): Promise<{ token: string; expiresAt: Date }> {
-    const targetUser = await this.userRepository.findOne({ where: { id: impersonationDto.targetUserId } });
+  async impersonateUser(
+    impersonationDto: ImpersonationDto,
+    adminUserId: string,
+  ): Promise<{ token: string; expiresAt: Date }> {
+    const targetUser = await this.userRepository.findOne({
+      where: { id: impersonationDto.targetUserId },
+    });
     if (!targetUser) {
       throw new NotFoundException(`Target user ${impersonationDto.targetUserId} not found`);
     }
@@ -149,14 +175,14 @@ export class AdminService {
     };
 
     const token = this.jwtService.sign(payload);
-    
+
     this.impersonationTokens.set(token, { userId: targetUser.id, expiresAt });
 
     await this.auditService.log({
       userId: adminUserId,
       action: 'USER_IMPERSONATION',
       resource: `User:${targetUser.id}`,
-      details: { 
+      details: {
         reason: impersonationDto.reason,
         durationHours: impersonationDto.durationHours,
         expiresAt,
@@ -225,7 +251,7 @@ export class AdminService {
       .orderBy('userCount', 'DESC')
       .getRawMany();
 
-    return tenantStats.map(stat => ({
+    return tenantStats.map((stat) => ({
       tenantId: stat.tenantId,
       tenantName: `Tenant ${stat.tenantId}`,
       userCount: parseInt(stat.userCount),
@@ -245,11 +271,11 @@ export class AdminService {
       this.checkElasticsearchHealth(),
     ]);
 
-    const overallStatus = services.some(s => s.status === SystemHealthStatus.UNHEALTHY)
+    const overallStatus = services.some((s) => s.status === SystemHealthStatus.UNHEALTHY)
       ? SystemHealthStatus.UNHEALTHY
-      : services.some(s => s.status === SystemHealthStatus.DEGRADED)
-      ? SystemHealthStatus.DEGRADED
-      : SystemHealthStatus.HEALTHY;
+      : services.some((s) => s.status === SystemHealthStatus.DEGRADED)
+        ? SystemHealthStatus.DEGRADED
+        : SystemHealthStatus.HEALTHY;
 
     return {
       status: overallStatus,
@@ -265,7 +291,8 @@ export class AdminService {
   }
 
   async getAuditLogs(query: AuditLogQueryDto): Promise<{ logs: AuditLog[]; total: number }> {
-    const queryBuilder = this.auditLogRepository.createQueryBuilder('audit')
+    const queryBuilder = this.auditLogRepository
+      .createQueryBuilder('audit')
       .leftJoinAndSelect('audit.user', 'user');
 
     if (query.userId) {
@@ -519,15 +546,11 @@ export class AdminService {
 
   private async getCacheHitRate(): Promise<number> {
     const analytics = this.cache.getAnalytics();
-    return analytics.totalRequests
-      ? Math.round(analytics.hitRate * 1000) / 10
-      : 0;
+    return analytics.totalRequests ? Math.round(analytics.hitRate * 1000) / 10 : 0;
   }
 
   private async getCacheEvictionRate(): Promise<number> {
     const analytics = this.cache.getAnalytics();
-    return analytics.totalRequests
-      ? Math.round(analytics.evictionRate * 1000) / 10
-      : 0;
+    return analytics.totalRequests ? Math.round(analytics.evictionRate * 1000) / 10 : 0;
   }
 }

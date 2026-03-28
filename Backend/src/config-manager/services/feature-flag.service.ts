@@ -97,6 +97,6 @@ export class FeatureFlagService {
     // Deterministic hash-based rollout using userId
     const seed = userId ?? Math.random().toString();
     const hash = seed.split('').reduce((acc, c) => acc + c.charCodeAt(0), 0);
-    return (hash % 100) < flag.rolloutPct;
+    return hash % 100 < flag.rolloutPct;
   }
 }

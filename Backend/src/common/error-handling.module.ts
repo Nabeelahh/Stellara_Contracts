@@ -19,10 +19,6 @@ import { ErrorResponseInterceptor } from './interceptors/error-response.intercep
       useClass: ErrorResponseInterceptor,
     },
   ],
-  exports: [
-    GlobalExceptionFilter,
-    ValidationFilter,
-    ErrorResponseInterceptor,
-  ],
+  exports: [GlobalExceptionFilter, ValidationFilter, ErrorResponseInterceptor],
 })
 export class ErrorHandlingModule {}

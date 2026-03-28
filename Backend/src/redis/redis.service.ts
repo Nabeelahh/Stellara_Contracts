@@ -9,10 +9,7 @@ export class RedisService implements OnApplicationShutdown {
 
   constructor(private readonly configService: ConfigService) {
     const host = this.configService.get<string>('REDIS_HOST', 'localhost');
-    const port = parseInt(
-      this.configService.get<string>('REDIS_PORT', '6379'),
-      10,
-    );
+    const port = parseInt(this.configService.get<string>('REDIS_PORT', '6379'), 10);
     const password = this.configService.get<string>('REDIS_PASSWORD');
 
     this.bullConnection = {

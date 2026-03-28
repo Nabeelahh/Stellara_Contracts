@@ -48,10 +48,7 @@ export class WebhooksController {
   @Post('subscriptions')
   @Roles(Role.SUPER_ADMIN, Role.TENANT_ADMIN)
   @ApiOperation({ summary: 'Create a webhook subscription' })
-  createSubscription(
-    @Body() dto: CreateWebhookSubscriptionDto,
-    @Request() req: any,
-  ) {
+  createSubscription(@Body() dto: CreateWebhookSubscriptionDto, @Request() req: any) {
     return this.webhooksService.createSubscription(dto, req.user?.id);
   }
 
@@ -66,10 +63,7 @@ export class WebhooksController {
   @Patch('subscriptions/:id')
   @Roles(Role.SUPER_ADMIN, Role.TENANT_ADMIN)
   @ApiOperation({ summary: 'Update a webhook subscription' })
-  updateSubscription(
-    @Param('id') id: string,
-    @Body() dto: UpdateWebhookSubscriptionDto,
-  ) {
+  updateSubscription(@Param('id') id: string, @Body() dto: UpdateWebhookSubscriptionDto) {
     return this.webhooksService.updateSubscription(id, dto);
   }
 

@@ -42,7 +42,7 @@ const DEFAULT_SANITIZATION_OPTIONS: Required<SanitizationOptions> = {
 // Conservative SQLi heuristics; avoids blocking benign text like "hello world".
 const SQLI_KEYWORD_REGEX = new RegExp(
   String.raw`\b(select|insert|update|delete|drop|truncate|union|alter|create|grant|revoke|sleep|benchmark)\b`,
-  'i'
+  'i',
 );
 const SQLI_COMMENT_REGEX = /(--|\#|\/\*.*?\*\/)/i;
 const SQLI_BOOLEAN_BYPASS_REGEX = /\b(or|and)\b\s+1\s*=\s*1\b/i;
@@ -81,8 +81,6 @@ function sanitizeHtmlString(value: string, options: SanitizationOptions): string
     allowedAttributes: {},
     // Ensure dangerous tags never survive sanitization.
     disallowedTagsMode: 'discard',
-    // Prevent entity decoding surprises.
-    decodeEntities: false,
   });
 }
 
@@ -94,11 +92,7 @@ function isPlainObject(value: unknown): value is Record<string, unknown> {
   return Object.prototype.toString.call(value) === '[object Object]';
 }
 
-const DANGEROUS_KEYS = new Set([
-  '__proto__',
-  'prototype',
-  'constructor',
-]);
+const DANGEROUS_KEYS = new Set(['__proto__', 'prototype', 'constructor']);
 
 function stripNoSqlOperators(obj: Record<string, unknown>): Record<string, unknown> {
   const result: Record<string, unknown> = {};
@@ -110,13 +104,17 @@ function stripNoSqlOperators(obj: Record<string, unknown>): Record<string, unkno
   return result;
 }
 
-export function sanitizeDeep<T>(input: T, options: SanitizationOptions = {} as SanitizationOptions): T {
+export function sanitizeDeep<T>(
+  input: T,
+  options: SanitizationOptions = {} as SanitizationOptions,
+): T {
   // Primitive passthrough
   if (input === null || input === undefined) return input;
 
   if (typeof input === 'string') {
     const normalized = normalizeUnicode(input);
-    const detectSqlInjection = options.detectSqlInjection ?? DEFAULT_SANITIZATION_OPTIONS.detectSqlInjection;
+    const detectSqlInjection =
+      options.detectSqlInjection ?? DEFAULT_SANITIZATION_OPTIONS.detectSqlInjection;
     if (detectSqlInjection && containsSqlInjection(normalized)) {
       throw new SqlInjectionDetectedError();
     }
@@ -152,4 +150,3 @@ export function containsNoSqlOperators(value: unknown): boolean {
   }
   return false;
 }
-

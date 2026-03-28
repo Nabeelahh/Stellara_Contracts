@@ -41,7 +41,7 @@ export class ValidationFilter implements ExceptionFilter {
   }
 
   private formatValidationErrors(validationErrors: ValidationError): any[] {
-    return validationErrors.map(error => ({
+    return validationErrors.map((error) => ({
       field: error.property,
       code: this.getValidationErrorCode(error),
       message: this.getValidationErrorMessage(error),
@@ -56,7 +56,7 @@ export class ValidationFilter implements ExceptionFilter {
   private getValidationErrorCode(error: ValidationError): string {
     const constraints = error.constraints || {};
     const firstConstraint = Object.keys(constraints)[0];
-    
+
     const errorCodeMap = {
       isEmail: ERROR_CODES.INVALID_FIELD_VALUE,
       isString: ERROR_CODES.INVALID_FIELD_VALUE,
@@ -81,11 +81,11 @@ export class ValidationFilter implements ExceptionFilter {
   private getValidationErrorMessage(error: ValidationError): string {
     const constraints = error.constraints || {};
     const firstConstraint = Object.keys(constraints)[0];
-    
+
     if (constraints[firstConstraint]) {
       return constraints[firstConstraint] as string;
     }
-    
+
     // Default messages based on property
     const defaultMessageMap = {
       email: 'Invalid email format',

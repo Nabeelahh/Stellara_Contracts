@@ -1,0 +1,43 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: stellara-backend-ingress
+  namespace: stellara-backend
+  labels:
+    app.kubernetes.io/name: stellara-backend
+    app.kubernetes.io/component: ingress
+    app.kubernetes.io/part-of: stellara
+  annotations:
+    # Cloud-specific ingress annotations will be added in provider-specific files
+    nginx.ingress.kubernetes.io/rewrite-target: /
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+spec:
+  ingressClassName: nginx  # Will be overridden in cloud-specific configs
+  tls:
+  - hosts:
+    - api.stellara.io
+    - api.stellara.com
+    secretName: stellara-backend-tls
+  rules:
+  - host: api.stellara.io
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: stellara-backend
+            port:
+              number: 80
+  - host: api.stellara.com
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: stellara-backend
+            port:
+              number: 80

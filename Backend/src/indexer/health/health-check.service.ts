@@ -132,7 +132,6 @@ export class HealthCheckService {
           reconnectStatus,
         },
       };
-
     } catch (error) {
       return {
         status: 'unhealthy',
@@ -162,7 +161,6 @@ export class HealthCheckService {
           totalEvents: eventCount,
         },
       };
-
     } catch (error) {
       return {
         status: 'unhealthy',
@@ -201,7 +199,6 @@ export class HealthCheckService {
         error,
         details: stats,
       };
-
     } catch (error) {
       return {
         status: 'unhealthy',
@@ -216,12 +213,12 @@ export class HealthCheckService {
     try {
       const currentLedger = await this.storage.getLatestLedger();
       const latestLedger = await this.getLatestStellarLedger();
-      
+
       const lag = latestLedger - (currentLedger || 0);
       const isSyncing = this.eventListener.isRunning();
-      
+
       const lastSync = new Date(); // In a real implementation, track last successful sync
-      
+
       // Calculate sync rate (ledgers per minute)
       const syncRate = await this.calculateSyncRate();
 
@@ -233,7 +230,6 @@ export class HealthCheckService {
         lastSync,
         syncRate,
       };
-
     } catch (error) {
       this.logger.error('Error getting sync status:', error);
       return {
@@ -251,10 +247,10 @@ export class HealthCheckService {
     try {
       const stats = await this.getProcessingStats();
       const memUsage = process.memoryUsage();
-      
+
       // Calculate events per minute
       const eventsPerMinute = await this.calculateEventsPerMinute();
-      
+
       // Calculate error rate
       const errorRate = await this.calculateErrorRate();
 
@@ -266,7 +262,6 @@ export class HealthCheckService {
         memoryUsage: memUsage.heapUsed / 1024 / 1024, // MB
         cpuUsage: process.cpuUsage().user / 1000000, // seconds
       };
-
     } catch (error) {
       this.logger.error('Error getting health metrics:', error);
       return {
@@ -281,14 +276,14 @@ export class HealthCheckService {
   }
 
   private determineOverallStatus(statuses: ComponentHealth['status'][]): HealthStatus['status'] {
-    if (statuses.some(status => status === 'unhealthy')) {
+    if (statuses.some((status) => status === 'unhealthy')) {
       return 'unhealthy';
     }
-    
-    if (statuses.some(status => status === 'degraded')) {
+
+    if (statuses.some((status) => status === 'degraded')) {
       return 'degraded';
     }
-    
+
     return 'healthy';
   }
 
@@ -313,11 +308,11 @@ export class HealthCheckService {
   private async calculateErrorRate(): Promise<number> {
     // Calculate error rate as percentage
     const stats = await this.getProcessingStats();
-    
+
     if (stats.processedCount === 0) {
       return 0;
     }
-    
+
     return (stats.failedCount / stats.processedCount) * 100;
   }
 
@@ -387,20 +382,21 @@ export class HealthCheckService {
 
     // Calculate average response time
     const responseTimes = history
-      .map(h => Object.values(h.components).map(c => c.responseTime || 0))
+      .map((h) => Object.values(h.components).map((c) => c.responseTime || 0))
       .flat()
-      .filter(t => t > 0);
+      .filter((t) => t > 0);
 
-    const averageResponseTime = responseTimes.length > 0
-      ? responseTimes.reduce((sum, time) => sum + time, 0) / responseTimes.length
-      : 0;
+    const averageResponseTime =
+      responseTimes.length > 0
+        ? responseTimes.reduce((sum, time) => sum + time, 0) / responseTimes.length
+        : 0;
 
     // Analyze error trend
-    const recentErrors = history.slice(-10).map(h => h.metrics.errorRate);
+    const recentErrors = history.slice(-10).map((h) => h.metrics.errorRate);
     const errorTrend = this.calculateTrend(recentErrors);
 
     // Analyze sync trend
-    const recentSyncLag = history.slice(-10).map(h => h.sync.lag);
+    const recentSyncLag = history.slice(-10).map((h) => h.sync.lag);
     const syncTrend = this.calculateTrend(recentSyncLag, true); // Lower is better for lag
 
     return {
@@ -413,7 +409,7 @@ export class HealthCheckService {
 
   private calculateTrend(
     values: number[],
-    lowerIsBetter: boolean = false
+    lowerIsBetter: boolean = false,
   ): 'improving' | 'stable' | 'degrading' {
     if (values.length < 2) return 'stable';
 
@@ -438,7 +434,7 @@ export class HealthCheckService {
   }
 
   isHealthy(): boolean {
-    return this.healthHistory.length > 0 
+    return this.healthHistory.length > 0
       ? this.healthHistory[this.healthHistory.length - 1].status === 'healthy'
       : false;
   }

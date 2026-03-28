@@ -1,11 +1,34 @@
-import { Controller, Post, Body, Res, Req, UseGuards, Get, UnauthorizedException } from '@nestjs/common';
+import {
+  Controller,
+  Post,
+  Body,
+  Res,
+  Req,
+  UseGuards,
+  Get,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { Response, Request } from 'express';
-import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiBody, ApiCookieAuth } from '@nestjs/swagger';
+import {
+  ApiTags,
+  ApiOperation,
+  ApiResponse,
+  ApiBearerAuth,
+  ApiBody,
+  ApiCookieAuth,
+} from '@nestjs/swagger';
 import { AuthService } from './auth.service';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { CurrentUser } from './decorators/current-user.decorator';
 import { ConfigService } from '@nestjs/config';
-import { LoginDto, LoginResponseDto, RefreshTokenDto, RefreshResponseDto, LogoutResponseDto, UserProfileDto } from './dto/auth.dto';
+import {
+  LoginDto,
+  LoginResponseDto,
+  RefreshTokenDto,
+  RefreshResponseDto,
+  LogoutResponseDto,
+  UserProfileDto,
+} from './dto/auth.dto';
 
 @ApiTags('auth')
 @ApiBearerAuth('JWT-auth')
@@ -18,25 +41,29 @@ export class AuthController {
   ) {}
 
   @Post('login')
-  @ApiOperation({ 
+  @ApiOperation({
     summary: 'Login with wallet address',
-    description: 'Authenticates a user by their wallet address and returns JWT tokens. Tokens are also set as HTTP-only cookies.'
+    description:
+      'Authenticates a user by their wallet address and returns JWT tokens. Tokens are also set as HTTP-only cookies.',
   })
   @ApiBody({ type: LoginDto })
-  @ApiResponse({ 
-    status: 201, 
+  @ApiResponse({
+    status: 201,
     description: 'Successfully logged in',
-    type: LoginResponseDto 
+    type: LoginResponseDto,
   })
-  @ApiResponse({ 
-    status: 401, 
-    description: 'Unauthorized - Wallet address is required' 
+  @ApiResponse({
+    status: 401,
+    description: 'Unauthorized - Wallet address is required',
   })
-  async login(@Body() body: LoginDto, @Res({ passthrough: true }) res: Response): Promise<LoginResponseDto> {
+  async login(
+    @Body() body: LoginDto,
+    @Res({ passthrough: true }) res: Response,
+  ): Promise<LoginResponseDto> {
     if (!body.walletAddress) {
       throw new UnauthorizedException('Wallet address is required');
     }
-    
+
     const { accessToken, refreshToken, user } = await this.authService.login(
       body.walletAddress,
       req,
@@ -44,30 +71,35 @@ export class AuthController {
 
     this.setCookies(res, accessToken, refreshToken);
 
-    return { 
-      message: 'Logged in successfully', 
-      accessToken, 
+    return {
+      message: 'Logged in successfully',
+      accessToken,
       refreshToken,
-      user
+      user,
     };
   }
 
   @Post('refresh')
-  @ApiOperation({ 
+  @ApiOperation({
     summary: 'Refresh access token',
-    description: 'Refreshes the access token using a valid refresh token from cookies or request body'
+    description:
+      'Refreshes the access token using a valid refresh token from cookies or request body',
   })
   @ApiBody({ type: RefreshTokenDto, required: false })
-  @ApiResponse({ 
-    status: 201, 
+  @ApiResponse({
+    status: 201,
     description: 'Tokens refreshed successfully',
-    type: RefreshResponseDto 
+    type: RefreshResponseDto,
   })
-  @ApiResponse({ 
-    status: 401, 
-    description: 'Unauthorized - Refresh token not found' 
+  @ApiResponse({
+    status: 401,
+    description: 'Unauthorized - Refresh token not found',
   })
-  async refresh(@Req() req: Request, @Body() body: RefreshTokenDto, @Res({ passthrough: true }) res: Response): Promise<RefreshResponseDto> {
+  async refresh(
+    @Req() req: Request,
+    @Body() body: RefreshTokenDto,
+    @Res({ passthrough: true }) res: Response,
+  ): Promise<RefreshResponseDto> {
     const refreshToken = req.cookies['refresh_token'] || body.refreshToken;
     if (!refreshToken) {
       throw new UnauthorizedException('Refresh token not found');
@@ -81,26 +113,30 @@ export class AuthController {
 
   @UseGuards(JwtAuthGuard)
   @Post('logout')
-  @ApiOperation({ 
+  @ApiOperation({
     summary: 'Logout user',
-    description: 'Invalidates the current access token and clears authentication cookies'
+    description: 'Invalidates the current access token and clears authentication cookies',
   })
-  @ApiResponse({ 
-    status: 201, 
+  @ApiResponse({
+    status: 201,
     description: 'Successfully logged out',
-    type: LogoutResponseDto 
+    type: LogoutResponseDto,
   })
-  @ApiResponse({ 
-    status: 401, 
-    description: 'Unauthorized - Invalid or missing token' 
+  @ApiResponse({
+    status: 401,
+    description: 'Unauthorized - Invalid or missing token',
   })
-  async logout(@Req() req: Request, @CurrentUser() user: any, @Res({ passthrough: true }) res: Response): Promise<LogoutResponseDto> {
+  async logout(
+    @Req() req: Request,
+    @CurrentUser() user: any,
+    @Res({ passthrough: true }) res: Response,
+  ): Promise<LogoutResponseDto> {
     const accessToken = req.cookies['access_token'] || req.headers.authorization?.split(' ')[1];
-    
+
     if (accessToken) {
       await this.authService.logout(user.id, accessToken, user.sessionId);
     }
-    
+
     res.clearCookie('access_token');
     res.clearCookie('refresh_token');
 
@@ -109,18 +145,18 @@ export class AuthController {
 
   @UseGuards(JwtAuthGuard)
   @Get('me')
-  @ApiOperation({ 
+  @ApiOperation({
     summary: 'Get current user profile',
-    description: 'Returns the authenticated user\'s profile information'
+    description: "Returns the authenticated user's profile information",
   })
-  @ApiResponse({ 
-    status: 200, 
+  @ApiResponse({
+    status: 200,
     description: 'User profile retrieved successfully',
-    type: UserProfileDto 
+    type: UserProfileDto,
   })
-  @ApiResponse({ 
-    status: 401, 
-    description: 'Unauthorized - Invalid or missing token' 
+  @ApiResponse({
+    status: 401,
+    description: 'Unauthorized - Invalid or missing token',
   })
   getProfile(@CurrentUser() user: any): UserProfileDto {
     return user;
@@ -128,7 +164,7 @@ export class AuthController {
 
   private setCookies(res: Response, accessToken: string, refreshToken: string) {
     const isProduction = this.configService.get('NODE_ENV') === 'production';
-    
+
     // Access token cookie
     res.cookie('access_token', accessToken, {
       httpOnly: true,

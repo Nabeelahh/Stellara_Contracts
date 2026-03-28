@@ -84,7 +84,11 @@ export class RabbitMqService implements OnModuleInit {
     return this.channel;
   }
 
-  async publish<T>(eventName: EventName | string, payload: T, options: PublishOptions = {}): Promise<string> {
+  async publish<T>(
+    eventName: EventName | string,
+    payload: T,
+    options: PublishOptions = {},
+  ): Promise<string> {
     const domain = EVENT_DOMAIN[eventName] ?? 'user';
     const exchange = domainExchangeName(domain);
     const routingKey = String(eventName);
@@ -113,13 +117,22 @@ export class RabbitMqService implements OnModuleInit {
     return envelope.eventId;
   }
 
-  async publishToDlq(domain: RabbitMqDomain, eventName: string, envelope: BusEnvelope): Promise<void> {
+  async publishToDlq(
+    domain: RabbitMqDomain,
+    eventName: string,
+    envelope: BusEnvelope,
+  ): Promise<void> {
     const channel = this.getChannel();
     const dlq = dlqQueueName(domain, eventName);
     channel.sendToQueue(dlq, Buffer.from(JSON.stringify(envelope)), { persistent: true });
   }
 
-  async publishToRetry(domain: RabbitMqDomain, eventName: string, envelope: BusEnvelope, attempt: number): Promise<void> {
+  async publishToRetry(
+    domain: RabbitMqDomain,
+    eventName: string,
+    envelope: BusEnvelope,
+    attempt: number,
+  ): Promise<void> {
     const channel = this.getChannel();
     const retryQueue = retryQueueName(domain, eventName, attempt);
     channel.sendToQueue(retryQueue, Buffer.from(JSON.stringify({ ...envelope, attempt })), {
@@ -144,4 +157,3 @@ export class RabbitMqService implements OnModuleInit {
     return res === 'OK';
   }
 }
-

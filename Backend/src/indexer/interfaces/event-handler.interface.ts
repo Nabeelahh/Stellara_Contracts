@@ -18,6 +18,12 @@ export interface IEventHandler {
   handle(event: ParsedContractEvent): Promise<void>;
 
   /**
+   * Undo a previously processed event (rollback)
+   * @param event The parsed contract event to undo
+   */
+  undo(event: ParsedContractEvent): Promise<void>;
+
+  /**
    * Validate event data before processing
    * @param event The parsed contract event
    * @returns true if valid, false otherwise

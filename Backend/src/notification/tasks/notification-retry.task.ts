@@ -52,7 +52,11 @@ export class NotificationRetryTask {
         switch (delivery.channel) {
           case 'EMAIL':
             if (user.email) {
-              await this.emailService.sendEmail(user.email, notification.title, `<p>${notification.message}</p>`);
+              await this.emailService.sendEmail(
+                user.email,
+                notification.title,
+                `<p>${notification.message}</p>`,
+              );
             }
             break;
           case 'SMS':
@@ -90,7 +94,9 @@ export class NotificationRetryTask {
           },
         });
 
-        this.logger.log(`Successfully retried ${delivery.channel} for notification ${delivery.notificationId}`);
+        this.logger.log(
+          `Successfully retried ${delivery.channel} for notification ${delivery.notificationId}`,
+        );
       } catch (error) {
         this.logger.error(`Retry failed for delivery ${delivery.id}: ${error.message}`);
 

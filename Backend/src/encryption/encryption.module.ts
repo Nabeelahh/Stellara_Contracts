@@ -16,10 +16,6 @@ import { APP_INTERCEPTOR } from '@nestjs/core';
       useClass: EncryptionInterceptor,
     },
   ],
-  exports: [
-    EncryptionService,
-    EncryptionInterceptor,
-    EncryptionGuard,
-  ],
+  exports: [EncryptionService, EncryptionInterceptor, EncryptionGuard],
 })
 export class EncryptionModule {}

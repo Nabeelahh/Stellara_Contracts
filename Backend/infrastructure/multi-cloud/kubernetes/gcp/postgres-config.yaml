@@ -1,0 +1,76 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: stellara-postgres-config
+  namespace: stellara-backend
+data:
+  postgresql.conf: |
+    # PostgreSQL configuration for Google GKE
+    listen_addresses = '*'
+    port = 5432
+    max_connections = 100
+    shared_preload_libraries = 'pg_stat_statements'
+    shared_buffers = 256MB
+    effective_cache_size = 1GB
+    maintenance_work_mem = 64MB
+    checkpoint_completion_target = 0.9
+    wal_buffers = 16MB
+    default_statistics_target = 100
+    random_page_cost = 1.1
+    effective_io_concurrency = 200
+    work_mem = 4MB
+    min_wal_size = 1GB
+    max_wal_size = 4GB
+    max_worker_processes = 4
+    max_parallel_workers_per_gather = 2
+    max_parallel_workers = 4
+    max_parallel_maintenance_workers = 2
+    # WAL archiving for cross-region replication
+    wal_level = replica
+    archive_mode = on
+    archive_command = '/usr/local/bin/wal-archive.sh %p %f'
+    # Replication settings
+    max_wal_senders = 10
+    max_replication_slots = 10
+    hot_standby = on
+    # Logging
+    log_line_prefix = '%t [%p]: [%l-1] user=%u,db=%d,app=%a,client=%h '
+    log_statement = 'ddl'
+    log_duration = on
+    log_min_duration_statement = 1000
+    # Extensions
+    pg_stat_statements.max = 10000
+    pg_stat_statements.track = all
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: stellara-postgres-scripts
+  namespace: stellara-backend
+data:
+  wal-archive.sh: |
+    #!/bin/bash
+    # WAL archiving script for Google Cloud Storage
+    set -e
+
+    WAL_PATH=$1
+    WAL_FILE=$2
+
+    # Upload to GCS
+    gsutil cp "$WAL_PATH" "gs://stellara-wal-archives-us-central1/$WAL_FILE"
+
+    echo "WAL file $WAL_FILE archived to GCS"
+
+  wal-restore.sh: |
+    #!/bin/bash
+    # WAL restore script for Google Cloud Storage
+    set -e
+
+    WAL_PATH=$1
+    WAL_FILE=$2
+
+    # Download from GCS
+    gsutil cp "gs://stellara-wal-archives-us-central1/$WAL_FILE" "$WAL_PATH"
+
+    echo "WAL file $WAL_FILE restored from GCS"

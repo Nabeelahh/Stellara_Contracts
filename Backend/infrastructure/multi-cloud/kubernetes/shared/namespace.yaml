@@ -1,0 +1,9 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: stellara-backend
+  labels:
+    name: stellara-backend
+    app.kubernetes.io/name: stellara-backend
+    app.kubernetes.io/component: backend
+    app.kubernetes.io/part-of: stellara

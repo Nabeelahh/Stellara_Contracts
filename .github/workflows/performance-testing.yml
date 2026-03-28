@@ -1,0 +1,48 @@
+name: Performance Testing
+
+on:
+  pull_request:
+    paths:
+      - 'Backend/**'
+      - '.github/workflows/performance-testing.yml'
+  schedule:
+    - cron: '0 4 * * 1'
+
+jobs:
+  performance:
+    name: Run performance regression tests
+    runs-on: ubuntu-latest
+    env:
+      TARGET_URL: ${{ secrets.PERFORMANCE_TARGET_URL }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install backend dependencies
+        run: npm ci
+        working-directory: Backend
+
+      - name: Verify target URL
+        run: |
+          if [ -z "$TARGET_URL" ]; then
+            echo "PERFORMANCE_TARGET_URL is not configured in secrets.";
+            exit 1;
+          fi
+
+      - name: Run k6 load test
+        uses: k6io/github-action@v5
+        with:
+          filename: Backend/k6/load-test.js
+          args: --out json=Backend/k6/results.json
+
+      - name: Upload performance results
+        uses: actions/upload-artifact@v4
+        with:
+          name: performance-results
+          path: Backend/k6/results.json

@@ -55,10 +55,7 @@ export class RestoreService {
   /**
    * Point-in-time recovery (PITR)
    */
-  async pointInTimeRecovery(
-    backupId: string,
-    targetTime: Date,
-  ): Promise<RestoreJob> {
+  async pointInTimeRecovery(backupId: string, targetTime: Date): Promise<RestoreJob> {
     const id = `pitr-${Date.now()}`;
     const job: RestoreJob = {
       id,
@@ -106,14 +103,7 @@ export class RestoreService {
       const dbPassword = this.configService.get('DATABASE_PASSWORD');
 
       // Restore using pg_restore
-      await this.restoreDatabase(
-        tempPath,
-        dbHost,
-        dbPort,
-        dbUser,
-        dbName,
-        dbPassword,
-      );
+      await this.restoreDatabase(tempPath, dbHost, dbPort, dbUser, dbName, dbPassword);
 
       // Clean up
       fs.unlinkSync(tempPath);
@@ -146,9 +136,7 @@ export class RestoreService {
       // 3. Start PostgreSQL in recovery mode
       // 4. Monitor recovery until target time is reached
 
-      this.logger.log(
-        `Starting PITR to ${job.targetTime?.toISOString()}`,
-      );
+      this.logger.log(`Starting PITR to ${job.targetTime?.toISOString()}`);
 
       // Download base backup
       const tempPath = path.join(this.restoreDir, `pitr-base-${job.id}.sql`);
@@ -161,14 +149,7 @@ export class RestoreService {
       const dbName = this.configService.get('DATABASE_NAME');
       const dbPassword = this.configService.get('DATABASE_PASSWORD');
 
-      await this.restoreDatabase(
-        tempPath,
-        dbHost,
-        dbPort,
-        dbUser,
-        dbName,
-        dbPassword,
-      );
+      await this.restoreDatabase(tempPath, dbHost, dbPort, dbUser, dbName, dbPassword);
 
       fs.unlinkSync(tempPath);
 
@@ -189,10 +170,7 @@ export class RestoreService {
   /**
    * Download backup from S3
    */
-  private async downloadBackup(
-    backupId: string,
-    destinationPath: string,
-  ): Promise<void> {
+  private async downloadBackup(backupId: string, destinationPath: string): Promise<void> {
     const bucket = this.configService.get('S3_BACKUP_BUCKET');
     const region = this.configService.get('AWS_REGION', 'us-east-1');
 

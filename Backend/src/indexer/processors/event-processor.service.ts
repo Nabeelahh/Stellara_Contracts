@@ -54,7 +54,7 @@ export class EventProcessorService {
   registerTransformer(
     contractId: string,
     eventName: string,
-    transformFn: (event: SorobanEvent) => any
+    transformFn: (event: SorobanEvent) => any,
   ): void {
     const key = `${contractId}:${eventName}`;
     const transformers = this.transformers.get(key) || [];
@@ -75,7 +75,7 @@ export class EventProcessorService {
     }
 
     this.processingQueue.push(event);
-    
+
     if (!this.isProcessing) {
       this.processQueue();
     }
@@ -105,7 +105,7 @@ export class EventProcessorService {
       try {
         // Transform event data
         const transformedData = await this.transformEvent(event);
-        
+
         // Store in database
         const indexedEvent = await this.storage.storeEvent({
           ...event,
@@ -114,9 +114,7 @@ export class EventProcessorService {
         });
 
         const processingTime = Date.now() - startTime;
-        this.logger.debug(
-          `Processed event ${event.transactionHash} in ${processingTime}ms`
-        );
+        this.logger.debug(`Processed event ${event.transactionHash} in ${processingTime}ms`);
 
         return {
           success: true,
@@ -124,12 +122,11 @@ export class EventProcessorService {
           retryCount,
           processedAt: new Date(),
         };
-
       } catch (error) {
         retryCount++;
         this.logger.error(
           `Error processing event ${event.transactionHash} (attempt ${retryCount}):`,
-          error
+          error,
         );
 
         if (retryCount <= this.maxRetries) {
@@ -137,7 +134,7 @@ export class EventProcessorService {
         } else {
           // Log failed event for manual review
           await this.logFailedEvent(event, error);
-          
+
           return {
             success: false,
             eventId: event.id,
@@ -176,9 +173,7 @@ export class EventProcessorService {
         schema: parsedEvent.schema,
       };
     } catch (error) {
-      this.logger.debug(
-        `ABI registry parse skipped for ${event.contractId}: ${error.message}`,
-      );
+      this.logger.debug(`ABI registry parse skipped for ${event.contractId}: ${error.message}`);
     }
 
     const eventName = this.extractEventName(event);
@@ -337,7 +332,7 @@ export class EventProcessorService {
   private async logFailedEvent(event: SorobanEvent, error: any): Promise<void> {
     this.logger.error(
       `Failed to process event ${event.transactionHash} after ${this.maxRetries} retries:`,
-      error
+      error,
     );
 
     // Store failed event for manual review
@@ -373,12 +368,12 @@ export class EventProcessorService {
   }
 
   private sleep(ms: number): Promise<void> {
-    return new Promise(resolve => setTimeout(resolve, ms));
+    return new Promise((resolve) => setTimeout(resolve, ms));
   }
 
   getRegisteredTransformers(): Array<{ contractId: string; eventName: string }> {
     const transformers: Array<{ contractId: string; eventName: string }> = [];
-    
+
     for (const [key, transformerList] of this.transformers.entries()) {
       const [contractId, eventName] = key.split(':');
       transformers.push({ contractId, eventName });

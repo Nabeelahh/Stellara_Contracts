@@ -84,9 +84,7 @@ export class RateLimitService implements OnApplicationShutdown {
     process.env.RATE_LIMIT_QUEUE_TIMEOUT_MS,
     15_000,
   );
-  private readonly burstMultiplier = Number(
-    process.env.RATE_LIMIT_BURST_MULTIPLIER || '1.5',
-  );
+  private readonly burstMultiplier = Number(process.env.RATE_LIMIT_BURST_MULTIPLIER || '1.5');
   private readonly bucketTtlMs = parseDurationToMilliseconds(
     process.env.RATE_LIMIT_BUCKET_TTL_MS,
     120_000,
@@ -111,10 +109,7 @@ export class RateLimitService implements OnApplicationShutdown {
       async (job) => this.processQueuedRequest(job),
       {
         connection,
-        concurrency: parseInt(
-          process.env.RATE_LIMIT_QUEUE_CONCURRENCY || '50',
-          10,
-        ),
+        concurrency: parseInt(process.env.RATE_LIMIT_QUEUE_CONCURRENCY || '50', 10),
       },
     );
   }
@@ -125,12 +120,7 @@ export class RateLimitService implements OnApplicationShutdown {
     const bucketKey = this.getBucketKey(req, identity);
     const refillPerMs = policy.limitPerMinute / 60_000;
 
-    const immediate = await this.consumeBucket(
-      bucketKey,
-      refillPerMs,
-      policy.burstCapacity,
-      1,
-    );
+    const immediate = await this.consumeBucket(bucketKey, refillPerMs, policy.burstCapacity, 1);
 
     if (immediate.allowed) {
       return;
@@ -157,12 +147,15 @@ export class RateLimitService implements OnApplicationShutdown {
     } catch (error) {
       await job.remove().catch(() => undefined);
 
-      throw new HttpException({
-        message: 'Request exceeded rate limit queue timeout',
-        retryAfterMs: immediate.retryAfterMs,
-        queueTimeoutMs: this.queueTimeoutMs,
-        tier: policy.tier,
-      }, HttpStatus.TOO_MANY_REQUESTS);
+      throw new HttpException(
+        {
+          message: 'Request exceeded rate limit queue timeout',
+          retryAfterMs: immediate.retryAfterMs,
+          queueTimeoutMs: this.queueTimeoutMs,
+          tier: policy.tier,
+        },
+        HttpStatus.TOO_MANY_REQUESTS,
+      );
     }
   }
 
@@ -171,12 +164,7 @@ export class RateLimitService implements OnApplicationShutdown {
     const policy = this.buildPolicy(req, identity);
     const bucketKey = this.getBucketKey(req, identity);
     const refillPerMs = policy.limitPerMinute / 60_000;
-    const snapshot = await this.consumeBucket(
-      bucketKey,
-      refillPerMs,
-      policy.burstCapacity,
-      0,
-    );
+    const snapshot = await this.consumeBucket(bucketKey, refillPerMs, policy.burstCapacity, 0);
     const queueCounts = await this.queue.getJobCounts(
       'waiting',
       'active',
@@ -213,10 +201,7 @@ export class RateLimitService implements OnApplicationShutdown {
     );
 
     if (!result.allowed) {
-      await job.moveToDelayed(
-        Date.now() + Math.max(result.retryAfterMs, 50),
-        job.token,
-      );
+      await job.moveToDelayed(Date.now() + Math.max(result.retryAfterMs, 50), job.token);
       throw new DelayedError();
     }
 
@@ -225,8 +210,7 @@ export class RateLimitService implements OnApplicationShutdown {
 
   private buildPolicy(req: Request, identity: RateLimitIdentity): TierPolicy {
     const tier = this.resolveTier(req, identity);
-    const baseLimit =
-      tier === 'enterprise' ? 2000 : tier === 'pro' ? 500 : 100;
+    const baseLimit = tier === 'enterprise' ? 2000 : tier === 'pro' ? 500 : 100;
     const adaptiveLimit = Math.max(
       10,
       Math.floor(baseLimit * this.appState.getAdaptiveLoadFactor()),
@@ -235,26 +219,14 @@ export class RateLimitService implements OnApplicationShutdown {
     return {
       tier,
       limitPerMinute: adaptiveLimit,
-      burstCapacity: Math.max(
-        adaptiveLimit,
-        Math.round(adaptiveLimit * this.burstMultiplier),
-      ),
+      burstCapacity: Math.max(adaptiveLimit, Math.round(adaptiveLimit * this.burstMultiplier)),
       priority: tier === 'enterprise' ? 1 : tier === 'pro' ? 5 : 10,
     };
   }
 
-  private resolveTier(
-    req: Request,
-    identity: RateLimitIdentity,
-  ): RateLimitTier {
-    const headerTier = String(
-      req.headers['x-subscription-tier'] || '',
-    ).toLowerCase();
-    if (
-      headerTier === 'free' ||
-      headerTier === 'pro' ||
-      headerTier === 'enterprise'
-    ) {
+  private resolveTier(req: Request, identity: RateLimitIdentity): RateLimitTier {
+    const headerTier = String(req.headers['x-subscription-tier'] || '').toLowerCase();
+    if (headerTier === 'free' || headerTier === 'pro' || headerTier === 'enterprise') {
       return headerTier;
     }
 
@@ -282,7 +254,9 @@ export class RateLimitService implements OnApplicationShutdown {
 
     const ip =
       req.ip ||
-      String(req.headers['x-forwarded-for'] || '').split(',')[0].trim() ||
+      String(req.headers['x-forwarded-for'] || '')
+        .split(',')[0]
+        .trim() ||
       'anonymous';
 
     return `rate-limit:ip:${ip}`;
@@ -308,10 +282,7 @@ export class RateLimitService implements OnApplicationShutdown {
         roles?: string[];
         subscriptionTier?: string;
       }>(token, {
-        secret: this.configService.get<string>(
-          'JWT_SECRET',
-          'super_secret_key_for_development',
-        ),
+        secret: this.configService.get<string>('JWT_SECRET', 'super_secret_key_for_development'),
       });
 
       return {
@@ -345,8 +316,9 @@ export class RateLimitService implements OnApplicationShutdown {
     cost: number,
   ): Promise<BucketResult> {
     const now = Date.now();
-    const [allowed, remainingTokens, retryAfterMs] =
-      (await this.redisService.getClient().eval(
+    const [allowed, remainingTokens, retryAfterMs] = (await this.redisService
+      .getClient()
+      .eval(
         TOKEN_BUCKET_SCRIPT,
         1,
         bucketKey,

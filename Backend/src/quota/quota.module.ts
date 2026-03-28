@@ -6,11 +6,7 @@ import { TenantQuotaService } from './quota.service';
 
 @Module({
   imports: [RedisModule, NotificationModule],
-  providers: [
-    TenantQuotaService,
-    TenantQuotaMiddleware,
-  ],
+  providers: [TenantQuotaService, TenantQuotaMiddleware],
   exports: [TenantQuotaService, TenantQuotaMiddleware],
 })
 export class QuotaModule {}
-

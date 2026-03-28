@@ -2,6 +2,7 @@ import { Injectable, Logger, NotFoundException, BadRequestException } from '@nes
 import { PrismaService } from '../prisma.service';
 import { StripeService } from './stripe.service';
 import { PaymentService } from './payment.service';
+import { FraudService } from '../fraud/fraud.service';
 import { SubscriptionStatus, PaymentEventType } from '@prisma/client';
 import Stripe from 'stripe';
 
@@ -13,6 +14,7 @@ export class SubscriptionService {
     private readonly prisma: PrismaService,
     private readonly stripeService: StripeService,
     private readonly paymentService: PaymentService,
+    private readonly fraudService: FraudService,
   ) {}
 
   async createSubscription(
@@ -36,6 +38,38 @@ export class SubscriptionService {
 
     if (!plan) {
       throw new NotFoundException('Subscription plan not found');
+    }
+
+    // Evaluate fraud score before creating customer/subscription
+    try {
+      const fraudResult = await this.fraudService.scorePayment({
+        tenantId,
+        email,
+        paymentMethodId: paymentMethodId || null,
+        planId,
+        isNewTenant: !existing,
+      });
+
+      if (fraudResult.action === 'block') {
+        this.logger.warn(
+          `Fraud block for tenant ${tenantId}: ${fraudResult.reasons.join(', ')}`,
+        );
+        throw new BadRequestException('Payment blocked due to suspected fraud');
+      }
+
+      if (fraudResult.action === 'challenge') {
+        this.logger.warn(
+          `Fraud challenge for tenant ${tenantId}: ${fraudResult.reasons.join(', ')}`,
+        );
+        throw new BadRequestException('Payment requires additional verification');
+      }
+    } catch (err) {
+      // If the fraud service throws unexpectedly, log and proceed conservatively by denying
+      if (!(err instanceof BadRequestException)) {
+        this.logger.error('Fraud scoring failed: ' + (err?.message || err));
+        throw new BadRequestException('Payment blocked due to fraud scoring failure');
+      }
+      throw err;
     }
 
     // Create or get Stripe customer

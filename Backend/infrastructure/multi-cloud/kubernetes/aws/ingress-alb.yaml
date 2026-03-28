@@ -1,0 +1,43 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: stellara-backend-ingress-aws
+  namespace: stellara-backend
+  labels:
+    app.kubernetes.io/name: stellara-backend
+    app.kubernetes.io/component: ingress
+    app.kubernetes.io/part-of: stellara
+  annotations:
+    # AWS ALB Ingress Controller annotations
+    kubernetes.io/ingress.class: alb
+    alb.ingress.kubernetes.io/scheme: internet-facing
+    alb.ingress.kubernetes.io/target-type: ip
+    alb.ingress.kubernetes.io/healthcheck-path: /api/v1/health
+    alb.ingress.kubernetes.io/healthcheck-port: '80'
+    alb.ingress.kubernetes.io/healthcheck-protocol: HTTP
+    alb.ingress.kubernetes.io/healthcheck-interval-seconds: '30'
+    alb.ingress.kubernetes.io/healthcheck-timeout-seconds: '5'
+    alb.ingress.kubernetes.io/healthy-threshold-count: '2'
+    alb.ingress.kubernetes.io/unhealthy-threshold-count: '2'
+    alb.ingress.kubernetes.io/success-codes: '200'
+    alb.ingress.kubernetes.io/listen-ports: '[{"HTTP": 80}, {"HTTPS": 443}]'
+    alb.ingress.kubernetes.io/ssl-redirect: '443'
+    alb.ingress.kubernetes.io/certificate-arn: arn:aws:acm:us-east-1:123456789012:certificate/certificate-id
+    alb.ingress.kubernetes.io/actions.ssl-redirect: '{"Type": "redirect", "RedirectConfig": {"Protocol": "HTTPS", "Port": "443", "StatusCode": "HTTP_301"}}'
+    alb.ingress.kubernetes.io/wafv2-acl-arn: arn:aws:wafv2:us-east-1:123456789012:regional/webacl/stellara-waf/12345678-1234-1234-1234-123456789012
+    # Multi-region routing
+    alb.ingress.kubernetes.io/conditions.stellara-backend: |
+      [{"field":"host-header","hostHeaderConfig":{"values":["api.stellara.io"]}}]
+spec:
+  ingressClassName: alb
+  rules:
+  - host: api.stellara.io
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: stellara-backend
+            port:
+              number: 80

@@ -72,7 +72,7 @@ export class EncryptionService {
   private async generateInitialKey(): Promise<void> {
     const keyId = this.generateKeyId();
     const keyData = this.generateEncryptionKey();
-    
+
     const encryptionKey: EncryptionKey = {
       id: keyId,
       keyData,
@@ -100,14 +100,14 @@ export class EncryptionService {
 
       // Generate IV for this encryption
       const iv = crypto.randomBytes(this.ivSize);
-      
+
       // Create cipher
       const cipher = crypto.createCipher(this.algorithm, activeKey.keyData);
-      
+
       // Encrypt the data
       let encrypted = cipher.update(data, 'utf8', 'hex');
       encrypted += cipher.final('hex');
-      
+
       const result: EncryptionResult = {
         encryptedData: encrypted,
         iv: iv.toString('hex'),
@@ -116,10 +116,10 @@ export class EncryptionService {
       };
 
       success = true;
-      
+
       // Update key usage
       activeKey.lastUsedAt = new Date();
-      
+
       // Log audit trail
       await this.logEncryptionActivity({
         keyId,
@@ -130,11 +130,10 @@ export class EncryptionService {
       });
 
       return result;
-
     } catch (err) {
       error = err.message;
       success = false;
-      
+
       await this.logEncryptionActivity({
         keyId,
         action: 'ENCRYPT',
@@ -148,7 +147,12 @@ export class EncryptionService {
     }
   }
 
-  async decryptField(encryptedData: string, iv: string, keyId: string, fieldType: string): Promise<DecryptionResult> {
+  async decryptField(
+    encryptedData: string,
+    iv: string,
+    keyId: string,
+    fieldType: string,
+  ): Promise<DecryptionResult> {
     const startTime = Date.now();
     let success = false;
     let error: string | undefined;
@@ -162,16 +166,16 @@ export class EncryptionService {
 
       // Create decipher
       const decipher = crypto.createDecipher(this.algorithm, key.keyData);
-      
+
       // Decrypt the data
       let decrypted = decipher.update(encryptedData, 'hex', 'utf8');
       decrypted += decipher.final('utf8');
-      
+
       success = true;
-      
+
       // Update key usage
       key.lastUsedAt = new Date();
-      
+
       // Log audit trail
       await this.logEncryptionActivity({
         keyId,
@@ -185,11 +189,10 @@ export class EncryptionService {
         decryptedData: decrypted,
         success,
       };
-
     } catch (err) {
       error = err.message;
       success = false;
-      
+
       await this.logEncryptionActivity({
         keyId,
         action: 'DECRYPT',
@@ -209,7 +212,7 @@ export class EncryptionService {
 
   async rotateKeys(): Promise<EncryptionKey> {
     this.logger.log('Starting key rotation...');
-    
+
     const startTime = Date.now();
     let success = false;
     let error: string | undefined;
@@ -218,7 +221,7 @@ export class EncryptionService {
       // Generate new key
       const newKeyId = this.generateKeyId();
       const newKeyData = this.generateEncryptionKey();
-      
+
       // Revoke old key
       const oldKey = this.getActiveKey();
       if (oldKey) {
@@ -238,9 +241,9 @@ export class EncryptionService {
       };
 
       this.encryptionKeys.set(newKeyId, newKey);
-      
+
       success = true;
-      
+
       await this.logEncryptionActivity({
         keyId: newKeyId,
         action: 'KEY_ROTATE',
@@ -250,11 +253,10 @@ export class EncryptionService {
 
       this.logger.log(`Key rotation completed. New key: ${newKeyId}`);
       return newKey;
-
     } catch (err) {
       error = err.message;
       success = false;
-      
+
       await this.logEncryptionActivity({
         keyId: 'unknown',
         action: 'KEY_ROTATE',
@@ -276,7 +278,7 @@ export class EncryptionService {
 
       key.isRevoked = true;
       key.expiresAt = new Date();
-      
+
       await this.logEncryptionActivity({
         keyId,
         action: 'KEY_REVOKE',
@@ -285,7 +287,6 @@ export class EncryptionService {
 
       this.logger.log(`Key revoked: ${keyId}`);
       return true;
-
     } catch (err) {
       this.logger.error(`Failed to revoke key ${keyId}:`, err);
       return false;
@@ -294,13 +295,13 @@ export class EncryptionService {
 
   getActiveKey(): EncryptionKey {
     const now = new Date();
-    
+
     for (const key of this.encryptionKeys.values()) {
       if (!key.isRevoked && key.expiresAt > now) {
         return key;
       }
     }
-    
+
     throw new Error('No active encryption key available');
   }
 
@@ -334,11 +335,11 @@ export class EncryptionService {
   } {
     const now = new Date();
     const keys = Array.from(this.encryptionKeys.values());
-    
-    const activeKeys = keys.filter(key => !key.isRevoked && key.expiresAt > now).length;
-    const revokedKeys = keys.filter(key => key.isRevoked).length;
-    
-    const dates = keys.map(key => key.createdAt);
+
+    const activeKeys = keys.filter((key) => !key.isRevoked && key.expiresAt > now).length;
+    const revokedKeys = keys.filter((key) => key.isRevoked).length;
+
+    const dates = keys.map((key) => key.createdAt);
     const oldestKey = dates.length > 0 ? new Date(Math.min(...dates)) : null;
     const newestKey = dates.length > 0 ? new Date(Math.max(...dates)) : null;
 
@@ -382,28 +383,33 @@ export class EncryptionService {
     };
 
     this.auditLogs.push(logEntry);
-    
+
     // In production, save to database
     // await this.prisma.encryptionAuditLog.create({ data: logEntry });
-    
-    this.logger.debug(`Encryption audit: ${activity.action} - ${activity.success ? 'SUCCESS' : 'FAILED'}`);
+
+    this.logger.debug(
+      `Encryption audit: ${activity.action} - ${activity.success ? 'SUCCESS' : 'FAILED'}`,
+    );
   }
 
   private scheduleKeyRotation(): void {
     // Schedule key rotation check every hour
-    setInterval(async () => {
-      try {
-        const activeKey = this.getActiveKey();
-        const now = new Date();
-        
-        // Rotate if key expires within next 24 hours
-        if (activeKey.expiresAt.getTime() - now.getTime() <= 24 * 60 * 60 * 1000) {
-          await this.rotateKeys();
+    setInterval(
+      async () => {
+        try {
+          const activeKey = this.getActiveKey();
+          const now = new Date();
+
+          // Rotate if key expires within next 24 hours
+          if (activeKey.expiresAt.getTime() - now.getTime() <= 24 * 60 * 60 * 1000) {
+            await this.rotateKeys();
+          }
+        } catch (error) {
+          this.logger.error('Key rotation check failed:', error);
         }
-      } catch (error) {
-        this.logger.error('Key rotation check failed:', error);
-      }
-    }, 60 * 60 * 1000); // Every hour
+      },
+      60 * 60 * 1000,
+    ); // Every hour
   }
 
   // Utility methods for common field types
@@ -443,7 +449,7 @@ export class EncryptionService {
     const recommendations: string[] = [];
 
     const status = this.getEncryptionStatus();
-    
+
     // Check for active keys
     if (status.activeKeys === 0) {
       issues.push('No active encryption keys available');
@@ -452,9 +458,10 @@ export class EncryptionService {
 
     // Check for expired keys
     const now = new Date();
-    const expiredKeys = Array.from(this.encryptionKeys.values())
-      .filter(key => !key.isRevoked && key.expiresAt <= now);
-    
+    const expiredKeys = Array.from(this.encryptionKeys.values()).filter(
+      (key) => !key.isRevoked && key.expiresAt <= now,
+    );
+
     if (expiredKeys.length > 0) {
       issues.push(`${expiredKeys.length} expired keys found`);
       recommendations.push('Rotate expired keys immediately');
@@ -464,7 +471,7 @@ export class EncryptionService {
     const activeKey = this.getActiveKey();
     const timeToExpiration = activeKey.expiresAt.getTime() - now.getTime();
     const daysToExpiration = timeToExpiration / (24 * 60 * 60 * 1000);
-    
+
     if (daysToExpiration < 7) {
       issues.push(`Key expires in ${Math.ceil(daysToExpiration)} days`);
       recommendations.push('Schedule key rotation');

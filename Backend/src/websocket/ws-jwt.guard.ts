@@ -1,4 +1,10 @@
-import { CanActivate, ExecutionContext, Injectable, Logger, UnauthorizedException } from '@nestjs/common';
+import {
+  CanActivate,
+  ExecutionContext,
+  Injectable,
+  Logger,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import { WsException } from '@nestjs/websockets';
@@ -26,7 +32,10 @@ export class WsJwtGuard implements CanActivate {
     }
 
     try {
-      const secret = this.configService.get<string>('JWT_SECRET', 'super_secret_key_for_development');
+      const secret = this.configService.get<string>(
+        'JWT_SECRET',
+        'super_secret_key_for_development',
+      );
       const payload = this.jwtService.verify(token, { secret });
 
       const isBlacklisted = await this.authService.isTokenBlacklisted(token);
@@ -62,9 +71,7 @@ export class WsJwtGuard implements CanActivate {
     }
     // Fall back to query param or auth object
     return (
-      (client.handshake.auth?.token as string) ||
-      (client.handshake.query?.token as string) ||
-      null
+      (client.handshake.auth?.token as string) || (client.handshake.query?.token as string) || null
     );
   }
 }

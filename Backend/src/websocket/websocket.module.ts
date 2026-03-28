@@ -10,6 +10,8 @@ import { WsJwtGuard } from './ws-jwt.guard';
 import { AuthModule } from '../auth/auth.module';
 import { SessionModule } from '../sessions/session.module';
 
+import { WebsocketLoadBalancerService } from './load-balancer.service';
+
 @Module({
   imports: [
     AuthModule,
@@ -28,8 +30,9 @@ import { SessionModule } from '../sessions/session.module';
     MessagesGateway,
     WebsocketService,
     ConnectionStateService,
+    WebsocketLoadBalancerService,
     WsJwtGuard,
   ],
-  exports: [WebsocketService],
+  exports: [WebsocketService, WebsocketLoadBalancerService],
 })
 export class WebsocketModule {}

@@ -24,9 +24,7 @@ export class EncryptionController {
   @ApiOperation({ summary: 'Encrypt sensitive data' })
   @ApiResponse({ status: 200, description: 'Data encrypted successfully' })
   @ApiResponse({ status: 400, description: 'Encryption failed' })
-  async encryptData(
-    @Body() body: { data: string; fieldType: string },
-  ): Promise<any> {
+  async encryptData(@Body() body: { data: string; fieldType: string }): Promise<any> {
     try {
       const result = await this.encryptionService.encryptField(body.data, body.fieldType);
       return {
@@ -47,19 +45,14 @@ export class EncryptionController {
   @ApiResponse({ status: 200, description: 'Data decrypted successfully' })
   @ApiResponse({ status: 400, description: 'Decryption failed' })
   async decryptData(
-    @Body() body: { 
-      encryptedData: string; 
-      iv: string; 
-      keyId: string; 
-      fieldType: string 
-    },
+    @Body() body: { encryptedData: string; iv: string; keyId: string; fieldType: string },
   ): Promise<any> {
     try {
       const result = await this.encryptionService.decryptField(
         body.encryptedData,
         body.iv,
         body.keyId,
-        body.fieldType
+        body.fieldType,
       );
       return {
         success: true,
@@ -106,7 +99,7 @@ export class EncryptionController {
     const keys = this.encryptionService.getAllKeys();
     return {
       success: true,
-      keys: keys.map(key => ({
+      keys: keys.map((key) => ({
         id: key.id,
         algorithm: key.algorithm,
         keySize: key.keySize,
@@ -162,7 +155,7 @@ export class EncryptionController {
   async getStatus(): Promise<any> {
     const status = this.encryptionService.getEncryptionStatus();
     const schedule = this.encryptionService.getKeyRotationSchedule();
-    
+
     return {
       success: true,
       status,
@@ -175,7 +168,7 @@ export class EncryptionController {
   @ApiResponse({ status: 200, description: 'Compliance validation results' })
   async getCompliance(): Promise<any> {
     const compliance = await this.encryptionService.validateEncryptionCompliance();
-    
+
     return {
       success: true,
       compliance,
@@ -185,15 +178,13 @@ export class EncryptionController {
   @Get('audit-logs')
   @ApiOperation({ summary: 'Get encryption audit logs' })
   @ApiResponse({ status: 200, description: 'Audit logs' })
-  async getAuditLogs(
-    @Param('limit') limit?: string,
-  ): Promise<any> {
+  async getAuditLogs(@Param('limit') limit?: string): Promise<any> {
     const limitNum = limit ? parseInt(limit) : 100;
     const logs = this.encryptionService.getAuditLogs(limitNum);
-    
+
     return {
       success: true,
-      logs: logs.map(log => ({
+      logs: logs.map((log) => ({
         id: log.id,
         keyId: log.keyId,
         userId: log.userId,

@@ -7,12 +7,14 @@ import { AuthController } from './auth.controller';
 import { JwtStrategy } from './strategies/jwt.strategy';
 import { SessionModule } from '../sessions/session.module';
 import { RedisModule } from '../redis/redis.module';
+import { GeolocationModule } from '../geolocation/geolocation.module';
 
 @Module({
   imports: [
     PassportModule,
     SessionModule,
     RedisModule,
+    GeolocationModule,
     JwtModule.registerAsync({
       imports: [ConfigModule],
       inject: [ConfigService],

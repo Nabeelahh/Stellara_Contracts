@@ -24,4 +24,3 @@ export function dlqQueueName(domain: RabbitMqDomain, eventName: string): string 
 
 export const MAX_RETRIES = Number(process.env.RABBITMQ_MAX_RETRIES ?? 5);
 export const BASE_RETRY_DELAY_MS = Number(process.env.RABBITMQ_BASE_RETRY_DELAY_MS ?? 5000);
-

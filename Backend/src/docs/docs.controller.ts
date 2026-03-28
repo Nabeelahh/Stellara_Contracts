@@ -5,12 +5,12 @@ import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
 @Controller()
 export class DocsController {
   @Get('docs-info')
-  @ApiOperation({ 
+  @ApiOperation({
     summary: 'Get API documentation info',
-    description: 'Returns information about the API documentation and available endpoints'
+    description: 'Returns information about the API documentation and available endpoints',
   })
-  @ApiResponse({ 
-    status: 200, 
+  @ApiResponse({
+    status: 200,
     description: 'Documentation info',
     schema: {
       type: 'object',

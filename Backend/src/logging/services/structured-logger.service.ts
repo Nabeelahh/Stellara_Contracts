@@ -1,10 +1,4 @@
-import {
-  Injectable,
-  LoggerService,
-  Optional,
-  Inject,
-  Scope,
-} from '@nestjs/common';
+import { Injectable, LoggerService, Optional, Inject, Scope } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import pino from 'pino';
 import { AsyncContextService } from './async-context.service';
@@ -94,7 +88,7 @@ export class StructuredLoggerService implements LoggerService {
 
   error(message: any, trace?: string, context?: string): void {
     const logContext = this.getLogContext();
-    
+
     if (message instanceof Error) {
       this.pino.error(
         {
@@ -131,7 +125,7 @@ export class StructuredLoggerService implements LoggerService {
 
   fatal(message: any, trace?: string, context?: string): void {
     const logContext = this.getLogContext();
-    
+
     if (message instanceof Error) {
       this.pino.fatal(
         {
@@ -171,7 +165,10 @@ export class StructuredLoggerService implements LoggerService {
   /**
    * Start a performance trace
    */
-  startTrace(name: string, metadata?: Record<string, any>): { end: (additionalMetadata?: Record<string, any>) => void } {
+  startTrace(
+    name: string,
+    metadata?: Record<string, any>,
+  ): { end: (additionalMetadata?: Record<string, any>) => void } {
     const startTime = Date.now();
     const startHrTime = process.hrtime.bigint();
 
@@ -207,11 +204,7 @@ export class StructuredLoggerService implements LoggerService {
    * Create a child logger with additional context
    */
   child(context: string, additionalContext?: LogContext): StructuredLoggerService {
-    const childLogger = new StructuredLoggerService(
-      this.configService,
-      this.asyncContext,
-      context,
-    );
+    const childLogger = new StructuredLoggerService(this.configService, this.asyncContext, context);
 
     // Create child pino logger with merged context
     childLogger.pino = this.pino.child({
@@ -222,7 +215,11 @@ export class StructuredLoggerService implements LoggerService {
     return childLogger;
   }
 
-  private writeLog(level: 'info' | 'warn' | 'debug' | 'trace', message: any, context?: string): void {
+  private writeLog(
+    level: 'info' | 'warn' | 'debug' | 'trace',
+    message: any,
+    context?: string,
+  ): void {
     const logContext = this.getLogContext();
     const logData = {
       ...logContext,

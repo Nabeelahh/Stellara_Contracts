@@ -1,9 +1,4 @@
-import {
-  Injectable,
-  NestInterceptor,
-  ExecutionContext,
-  CallHandler,
-} from '@nestjs/common';
+import { Injectable, NestInterceptor, ExecutionContext, CallHandler } from '@nestjs/common';
 import { Observable } from 'rxjs';
 import { map } from 'rxjs/operators';
 import { Reflector } from '@nestjs/core';
@@ -19,7 +14,7 @@ export class EncryptionInterceptor implements NestInterceptor {
 
   intercept(context: ExecutionContext, next: CallHandler): Observable<any> {
     const request = context.switchToHttp().getRequest();
-    
+
     return next.handle().pipe(
       map(async (data) => {
         // Process the response data for encryption/decryption
@@ -35,9 +30,7 @@ export class EncryptionInterceptor implements NestInterceptor {
 
     // Handle arrays
     if (Array.isArray(data)) {
-      return await Promise.all(
-        data.map(item => this.processObject(item, request))
-      );
+      return await Promise.all(data.map((item) => this.processObject(item, request)));
     }
 
     // Handle single objects
@@ -83,18 +76,18 @@ export class EncryptionInterceptor implements NestInterceptor {
 
   private getEncryptedFields(constructor: any): any[] {
     const fields = [];
-    
+
     // Get all properties of the constructor prototype
     const prototype = constructor.prototype;
-    
+
     for (const propertyKey in prototype) {
       const metadata = Reflect.getMetadata(ENCRYPTED_FIELD_KEY, prototype, propertyKey);
-      
+
       if (metadata) {
         fields.push(metadata);
       }
     }
-    
+
     return fields;
   }
 
@@ -111,9 +104,9 @@ export class EncryptionInterceptor implements NestInterceptor {
 
   private async encryptValue(value: any, fieldType: string): Promise<any> {
     const stringValue = typeof value === 'string' ? value : JSON.stringify(value);
-    
+
     const result = await this.encryptionService.encryptField(stringValue, fieldType);
-    
+
     return {
       encryptedData: result.encryptedData,
       iv: result.iv,
@@ -128,7 +121,7 @@ export class EncryptionInterceptor implements NestInterceptor {
         encryptedValue.encryptedData,
         encryptedValue.iv,
         encryptedValue.keyId,
-        fieldType
+        fieldType,
       );
 
       if (result.success) {

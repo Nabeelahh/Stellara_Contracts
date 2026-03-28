@@ -1,8 +1,4 @@
-import {
-  Injectable,
-  Logger,
-  UnauthorizedException,
-} from '@nestjs/common';
+import { Injectable, Logger, UnauthorizedException } from '@nestjs/common';
 import { Request } from 'express';
 import { randomUUID, createHash } from 'node:crypto';
 import { UAParser } from 'ua-parser-js';
@@ -64,10 +60,7 @@ export class SessionService {
     const now = new Date();
     const existingSessions = await this.listSessions(user.id);
     const device = this.extractDeviceInfo(request);
-    const suspiciousReasons = this.detectSuspiciousActivity(
-      existingSessions,
-      device,
-    );
+    const suspiciousReasons = this.detectSuspiciousActivity(existingSessions, device);
 
     const session: SessionRecord = {
       sessionId,
@@ -78,9 +71,7 @@ export class SessionService {
       createdAt: now.toISOString(),
       lastActivityAt: now.toISOString(),
       lastRefreshAt: now.toISOString(),
-      expiresAt: new Date(
-        now.getTime() + this.sessionTtlSeconds * 1000,
-      ).toISOString(),
+      expiresAt: new Date(now.getTime() + this.sessionTtlSeconds * 1000).toISOString(),
       refreshTokenHash: await bcrypt.hash(refreshToken, 10),
       suspicious: suspiciousReasons.length > 0,
       suspiciousReasons,
@@ -133,9 +124,7 @@ export class SessionService {
     session.refreshTokenHash = await bcrypt.hash(refreshToken, 10);
     session.lastRefreshAt = now;
     session.lastActivityAt = now;
-    session.expiresAt = new Date(
-      Date.now() + this.sessionTtlSeconds * 1000,
-    ).toISOString();
+    session.expiresAt = new Date(Date.now() + this.sessionTtlSeconds * 1000).toISOString();
     session.device = this.extractDeviceInfo(request);
 
     await this.persistSession(session);
@@ -203,17 +192,12 @@ export class SessionService {
   }
 
   @distributedlock({ key: 'user:{id}' })
-  async terminateOtherSessions(
-    userId: string,
-    currentSessionId: string,
-  ): Promise<number> {
+  async terminateOtherSessions(userId: string, currentSessionId: string): Promise<number> {
     const sessions = await this.listSessions(userId, currentSessionId);
     const otherSessions = sessions.filter((session) => !session.current);
 
     await Promise.all(
-      otherSessions.map((session) =>
-        this.deleteSession(userId, session.sessionId),
-      ),
+      otherSessions.map((session) => this.deleteSession(userId, session.sessionId)),
     );
 
     await this.logActivity(currentSessionId, 'other_sessions_terminated', {
@@ -239,10 +223,7 @@ export class SessionService {
     return entries.map((entry) => JSON.parse(entry));
   }
 
-  private async getRequiredSession(
-    userId: string,
-    sessionId: string,
-  ): Promise<SessionRecord> {
+  private async getRequiredSession(userId: string, sessionId: string): Promise<SessionRecord> {
     const session = await this.getSession(sessionId);
 
     if (!session || session.userId !== userId) {
@@ -253,9 +234,7 @@ export class SessionService {
   }
 
   private async getSession(sessionId: string): Promise<SessionRecord | null> {
-    const payload = await this.redisService
-      .getClient()
-      .get(this.sessionKey(sessionId));
+    const payload = await this.redisService.getClient().get(this.sessionKey(sessionId));
 
     if (!payload) {
       return null;
@@ -323,17 +302,15 @@ export class SessionService {
       request.headers['x-vercel-ip-country'] ||
       request.headers['x-country-code'] ||
       request.headers['x-country'];
-    const region =
-      request.headers['x-vercel-ip-country-region'] ||
-      request.headers['x-region'];
-    const city =
-      request.headers['x-vercel-ip-city'] ||
-      request.headers['x-city'];
+    const region = request.headers['x-vercel-ip-country-region'] || request.headers['x-region'];
+    const city = request.headers['x-vercel-ip-city'] || request.headers['x-city'];
 
-    return [country, region, city]
-      .filter(Boolean)
-      .map((part) => String(part))
-      .join(', ') || 'unknown';
+    return (
+      [country, region, city]
+        .filter(Boolean)
+        .map((part) => String(part))
+        .join(', ') || 'unknown'
+    );
   }
 
   private detectSuspiciousActivity(
@@ -342,7 +319,12 @@ export class SessionService {
   ): string[] {
     const reasons: string[] = [];
 
-    if (existingSessions.some((session) => session.device.location !== 'unknown' && session.device.location !== device.location)) {
+    if (
+      existingSessions.some(
+        (session) =>
+          session.device.location !== 'unknown' && session.device.location !== device.location,
+      )
+    ) {
       reasons.push('new_location_detected');
     }
 
@@ -375,9 +357,7 @@ export class SessionService {
     await this.redisService
       .getClient()
       .lpush(this.securityAlertsKey(session.userId), JSON.stringify(alert));
-    await this.redisService
-      .getClient()
-      .ltrim(this.securityAlertsKey(session.userId), 0, 49);
+    await this.redisService.getClient().ltrim(this.securityAlertsKey(session.userId), 0, 49);
     await this.redisService
       .getClient()
       .expire(this.securityAlertsKey(session.userId), this.sessionTtlSeconds);

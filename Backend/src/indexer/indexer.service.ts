@@ -52,19 +52,18 @@ export class IndexerService implements OnModuleInit {
     }
 
     this.logger.log('Starting indexer service...');
-    
+
     try {
       // Start event listener
       await this.eventListener.startListening(this.config.contractIds);
-      
+
       this.isRunning = true;
       this.logger.log('Indexer service started successfully');
-      
+
       // Perform initial backfill if enabled
       if (this.config.enableBackfill && this.config.startLedger) {
         await this.performInitialBackfill();
       }
-      
     } catch (error) {
       this.logger.error('Failed to start indexer:', error);
       this.isRunning = false;
@@ -78,12 +77,11 @@ export class IndexerService implements OnModuleInit {
     }
 
     this.logger.log('Stopping indexer service...');
-    
+
     try {
       await this.eventListener.stopListening();
       this.isRunning = false;
       this.logger.log('Indexer service stopped');
-      
     } catch (error) {
       this.logger.error('Error stopping indexer:', error);
       throw error;
@@ -109,15 +107,15 @@ export class IndexerService implements OnModuleInit {
   async backfillEvents(
     fromLedger: number,
     toLedger?: number,
-    contractIds?: string[]
+    contractIds?: string[],
   ): Promise<{ processed: number; errors: number }> {
     this.logger.log(`Starting backfill from ledger ${fromLedger} to ${toLedger || 'latest'}`);
-    
+
     try {
       const events = await this.eventListener.backfillEvents(
         fromLedger,
         toLedger,
-        contractIds || this.config.contractIds
+        contractIds || this.config.contractIds,
       );
 
       let processed = 0;
@@ -135,7 +133,6 @@ export class IndexerService implements OnModuleInit {
 
       this.logger.log(`Backfill completed: ${processed} processed, ${errors} errors`);
       return { processed, errors };
-      
     } catch (error) {
       this.logger.error('Backfill failed:', error);
       throw error;
@@ -144,11 +141,10 @@ export class IndexerService implements OnModuleInit {
 
   async reprocessEvent(transactionHash: string): Promise<void> {
     this.logger.log(`Reprocessing event: ${transactionHash}`);
-    
+
     try {
       await this.eventProcessor.reprocessEvent(transactionHash);
       this.logger.log(`Event reprocessed successfully: ${transactionHash}`);
-      
     } catch (error) {
       this.logger.error(`Failed to reprocess event ${transactionHash}:`, error);
       throw error;
@@ -169,14 +165,14 @@ export class IndexerService implements OnModuleInit {
     }
 
     const latestLedger = await this.storage.getLatestLedger();
-    
+
     if (latestLedger && latestLedger >= this.config.startLedger) {
       this.logger.log(`Skipping backfill - already at ledger ${latestLedger}`);
       return;
     }
 
     this.logger.log(`Performing initial backfill from ledger ${this.config.startLedger}`);
-    
+
     try {
       await this.backfillEvents(this.config.startLedger, latestLedger || undefined);
     } catch (error) {

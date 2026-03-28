@@ -59,21 +59,21 @@ jobs:
               title: `DR Drill: ${drillId}`,
               body: `## Disaster Recovery Drill
               
-**Drill ID:** ${drillId}
-**Environment:** ${environment}
-**Type:** ${drillType}
-**Started:** ${new Date().toISOString()}
+              **Drill ID:** ${drillId}
+              **Environment:** ${environment}
+              **Type:** ${drillType}
+              **Started:** ${new Date().toISOString()}
 
-### Status
-- [ ] Setup complete
-- [ ] Backup verified
-- [ ] Restore initiated
-- [ ] Data validation complete
-- [ ] RTO/RPO measured
-- [ ] Post-drill review complete
+              ### Status
+              - [ ] Setup complete
+              - [ ] Backup verified
+              - [ ] Restore initiated
+              - [ ] Data validation complete
+              - [ ] RTO/RPO measured
+              - [ ] Post-drill review complete
 
-### Notes
-Track progress and observations here.`,
+              ### Notes
+              Track progress and observations here.`,
               labels: ['disaster-recovery', 'drill', environment]
             });
 
@@ -240,31 +240,31 @@ Track progress and observations here.`,
             
             const report = `## DR Drill Report: ${drillId}
             
-### Summary
-- **Drill ID:** ${drillId}
-- **Environment:** ${environment}
-- **Type:** ${drillType}
-- **Status:** ${status === 'success' ? 'PASSED' : 'FAILED'}
-- **Total Duration:** ${totalTime} minutes
+            ### Summary
+            - **Drill ID:** ${drillId}
+            - **Environment:** ${environment}
+            - **Type:** ${drillType}
+            - **Status:** ${status === 'success' ? 'PASSED' : 'FAILED'}
+            - **Total Duration:** ${totalTime} minutes
             
-### Metrics
-- **RTO (Recovery Time Objective):** ${rto} minutes
-- **Target RTO:** 240 minutes (4 hours)
-- **Target RPO:** 60 minutes (1 hour)
+            ### Metrics
+            - **RTO (Recovery Time Objective):** ${rto} minutes
+            - **Target RTO:** 240 minutes (4 hours)
+            - **Target RPO:** 60 minutes (1 hour)
             
-### Results
-${status === 'success' ? 'All DR procedures executed successfully.' : 'DR drill encountered issues. Review logs for details.'}
+            ### Results
+            ${status === 'success' ? 'All DR procedures executed successfully.' : 'DR drill encountered issues. Review logs for details.'}
             
-### Recommendations
-Based on this drill:
-1. ${parseFloat(rto) < 120 ? 'RTO is well within target. Current procedures are efficient.' : 'Consider optimizing restore procedures to improve RTO.'}
-2. Document any issues encountered during the drill
-3. Update runbooks with lessons learned
+            ### Recommendations
+            Based on this drill:
+            1. ${parseFloat(rto) < 120 ? 'RTO is well within target. Current procedures are efficient.' : 'Consider optimizing restore procedures to improve RTO.'}
+            2. Document any issues encountered during the drill
+            3. Update runbooks with lessons learned
             
-### Next Steps
-- [ ] Review drill results with team
-- [ ] Update DR runbooks if needed
-- [ ] Schedule next drill (quarterly)`;
+            ### Next Steps
+            - [ ] Review drill results with team
+            - [ ] Update DR runbooks if needed
+            - [ ] Schedule next drill (quarterly)`;
             
             // Update the tracking issue
             const issues = await github.rest.issues.listForRepo({

@@ -59,10 +59,7 @@ export class UsersV2Controller {
   @ApiParam({ name: 'id', description: 'User ID' })
   @ApiResponse({ status: 200, description: 'User deleted' })
   @ApiResponse({ status: 404, description: 'User not found' })
-  async remove(
-    @Param('id') id: string,
-    @Headers() headers: Record<string, string>,
-  ): Promise<void> {
+  async remove(@Param('id') id: string, @Headers() headers: Record<string, string>): Promise<void> {
     return this.userService.remove(id);
   }
 }

@@ -15,9 +15,7 @@ import { Observable } from 'rxjs';
 
 @Injectable()
 class AdminGuard implements CanActivate {
-  canActivate(
-    context: ExecutionContext,
-  ): boolean | Promise<boolean> | Observable<boolean> {
+  canActivate(context: ExecutionContext): boolean | Promise<boolean> | Observable<boolean> {
     const request = context.switchToHttp().getRequest();
     // In production, check for admin role
     return true;
@@ -50,10 +48,7 @@ export class RestoreController {
   @HttpCode(HttpStatus.ACCEPTED)
   async restorePITR(@Body() dto: RestorePointDto) {
     const targetTime = dto.targetTime ? new Date(dto.targetTime) : new Date();
-    const job = await this.restoreService.pointInTimeRecovery(
-      dto.backupId,
-      targetTime,
-    );
+    const job = await this.restoreService.pointInTimeRecovery(dto.backupId, targetTime);
     return {
       jobId: job.id,
       status: job.status,

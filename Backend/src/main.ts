@@ -1,23 +1,26 @@
-import { NestFactory } from '@nestjs/core';
-import { ValidationPipe } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
-import { AppModule } from './app.module';
 import * as cookieParser from 'cookie-parser';
-import { UserThrottlerGuard } from './common/guards/user-throttler.guard';
-import { IoAdapter } from '@nestjs/platform-socket.io';
-import { StructuredLoggerService, ClsMiddleware, CorrelationIdMiddleware } from './logging';
-import { NestExpressApplication } from '@nestjs/platform-express';
-import { InflightRequestMiddleware } from './lifecycle/inflight-request.middleware';
+
+import { ClsMiddleware, CorrelationIdMiddleware, StructuredLoggerService } from './logging';
+
+import { AppModule } from './app.module';
 import { ApplicationStateService } from './lifecycle/application-state.service';
-import { inputSanitizationMiddleware } from './security/sanitization/input-sanitization.middleware';
+import { AuditInterceptor } from './audit';
+import { ConfigService } from '@nestjs/config';
+import { InflightRequestMiddleware } from './lifecycle/inflight-request.middleware';
+import { NestExpressApplication } from '@nestjs/platform-express';
+import { NestFactory } from '@nestjs/core';
+import { RedisIoAdapter } from './websocket/adapters/redis-io.adapter';
 import { TenantQuotaMiddleware } from './quota/tenant-quota.middleware';
+import { UserThrottlerGuard } from './common/guards/user-throttler.guard';
+import { ValidationPipe } from '@nestjs/common';
+import { inputSanitizationMiddleware } from './security/sanitization/input-sanitization.middleware';
 
 async function bootstrap() {
   // Create app with buffer logs to ensure we can use our custom logger
   const app = await NestFactory.create<NestExpressApplication>(AppModule, {
     bufferLogs: true,
   });
-  
+
   const configService = app.get(ConfigService);
   const logger = app.get(StructuredLoggerService);
   const clsMiddleware = app.get(ClsMiddleware);
@@ -60,7 +63,9 @@ async function bootstrap() {
   app.use(correlationIdMiddleware.use.bind(correlationIdMiddleware));
 
   // WebSocket adapter
-  app.useWebSocketAdapter(new IoAdapter(app));
+  const redisIoAdapter = new RedisIoAdapter(app);
+  await redisIoAdapter.connectToRedis();
+  app.useWebSocketAdapter(redisIoAdapter);
 
   // CORS
   app.enableCors({
@@ -73,6 +78,10 @@ async function bootstrap() {
 
   await appState.verifyStartupDependencies();
 
+  // Global audit interceptor for comprehensive action logging
+  const auditInterceptor = app.get(AuditInterceptor);
+  app.useGlobalInterceptors(auditInterceptor);
+
   const port = configService.get<number>('PORT', 3000);
   await app.listen(port);
   appState.markReady();
@@ -80,6 +89,7 @@ async function bootstrap() {
   logger.log(`Application is running on: http://localhost:${port}/${apiPrefix}`, 'Bootstrap');
   logger.log(`Environment: ${configService.get<string>('NODE_ENV', 'development')}`, 'Bootstrap');
   logger.log(`Log level: ${configService.get<string>('LOG_LEVEL', 'info')}`, 'Bootstrap');
+  logger.log(`Audit logging: enabled`, 'Bootstrap');
   logger.log(
     `Deployment slot: ${configService.get<string>('DEPLOYMENT_SLOT', 'standalone')} release=${configService.get<string>('RELEASE_VERSION', 'local')}`,
     'Bootstrap',

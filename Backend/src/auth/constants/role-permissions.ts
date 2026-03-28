@@ -29,8 +29,5 @@ export const RolePermissions: Record<Role, Permission[]> = {
     Permission.MAKE_CONTRIBUTION,
     Permission.VIEW_CONTRIBUTION,
   ],
-  [Role.VIEWER]: [
-    Permission.VIEW_PROJECT,
-    Permission.VIEW_CONTRIBUTION,
-  ],
+  [Role.VIEWER]: [Permission.VIEW_PROJECT, Permission.VIEW_CONTRIBUTION],
 };

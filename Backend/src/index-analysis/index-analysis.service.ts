@@ -45,8 +45,7 @@ export class IndexAnalysisService implements OnModuleInit {
   );
   private readonly migrationsDir = path.resolve(
     process.cwd(),
-    process.env.INDEX_ANALYSIS_MIGRATIONS_DIR ||
-      'prisma/generated-index-migrations',
+    process.env.INDEX_ANALYSIS_MIGRATIONS_DIR || 'prisma/generated-index-migrations',
   );
   private extensionEnabled = false;
 
@@ -60,9 +59,7 @@ export class IndexAnalysisService implements OnModuleInit {
 
   async ensurePgStatStatements(): Promise<boolean> {
     try {
-      await this.postgres.execute(
-        'CREATE EXTENSION IF NOT EXISTS pg_stat_statements',
-      );
+      await this.postgres.execute('CREATE EXTENSION IF NOT EXISTS pg_stat_statements');
     } catch (error) {
       this.logger.warn(
         `Unable to create pg_stat_statements extension automatically: ${error.message}`,
@@ -79,9 +76,7 @@ export class IndexAnalysisService implements OnModuleInit {
       `);
       this.extensionEnabled = Boolean(result?.[0]?.enabled);
     } catch (error) {
-      this.logger.warn(
-        `Unable to verify pg_stat_statements extension: ${error.message}`,
-      );
+      this.logger.warn(`Unable to verify pg_stat_statements extension: ${error.message}`);
       this.extensionEnabled = false;
     }
 
@@ -97,14 +92,8 @@ export class IndexAnalysisService implements OnModuleInit {
     const queryPatterns = await this.collectQueryPatterns();
     const unusedIndexes = await this.collectUnusedIndexes();
     const usageStats = await this.collectIndexUsageStats();
-    const recommendations = this.buildRecommendations(
-      queryPatterns,
-      usageStats,
-    );
-    const performanceMetrics = this.buildPerformanceMetrics(
-      queryPatterns,
-      recommendations,
-    );
+    const recommendations = this.buildRecommendations(queryPatterns, usageStats);
+    const performanceMetrics = this.buildPerformanceMetrics(queryPatterns, recommendations);
 
     const report: IndexAnalysisReport = {
       generatedAt: new Date().toISOString(),
@@ -144,10 +133,7 @@ export class IndexAnalysisService implements OnModuleInit {
   async generateMigrationScript(): Promise<{ path: string; recommendations: number }> {
     const report = (await this.getLatestReport()) || (await this.generateReport());
     const statements = report.recommendations.map((recommendation) => {
-      const name = this.buildIndexName(
-        recommendation.table,
-        recommendation.columns,
-      );
+      const name = this.buildIndexName(recommendation.table, recommendation.columns);
       return `CREATE INDEX CONCURRENTLY IF NOT EXISTS ${this.quoteIdentifier(name)} ON ${this.quoteQualifiedIdentifier(recommendation.table)} (${recommendation.columns.map((column) => this.quoteIdentifier(column)).join(', ')});`;
     });
 
@@ -156,11 +142,7 @@ export class IndexAnalysisService implements OnModuleInit {
       `${this.formatTimestampForFile(new Date())}_recommended_indexes.sql`,
     );
 
-    await fs.writeFile(
-      filePath,
-      statements.join('\n') + (statements.length ? '\n' : ''),
-      'utf8',
-    );
+    await fs.writeFile(filePath, statements.join('\n') + (statements.length ? '\n' : ''), 'utf8');
 
     return {
       path: filePath,
@@ -249,10 +231,7 @@ export class IndexAnalysisService implements OnModuleInit {
     `);
   }
 
-  private buildRecommendations(
-    patterns: QueryPattern[],
-    usageStats: any[],
-  ): IndexRecommendation[] {
+  private buildRecommendations(patterns: QueryPattern[], usageStats: any[]): IndexRecommendation[] {
     const existingIndexNames = new Set(
       usageStats.map((stat) => String(stat.index_name || '').toLowerCase()),
     );
@@ -281,11 +260,7 @@ export class IndexAnalysisService implements OnModuleInit {
             ? 'Frequent multi-column filter pattern detected'
             : 'Frequent filter without obvious supporting index',
         estimatedImpact:
-          pattern.meanExecTime > 100
-            ? 'high'
-            : pattern.meanExecTime > 25
-              ? 'medium'
-              : 'low',
+          pattern.meanExecTime > 100 ? 'high' : pattern.meanExecTime > 25 ? 'medium' : 'low',
       });
     }
 
@@ -296,22 +271,14 @@ export class IndexAnalysisService implements OnModuleInit {
     patterns: QueryPattern[],
     recommendations: IndexRecommendation[],
   ) {
-    const totalExecTimeMs = patterns.reduce(
-      (total, pattern) => total + pattern.totalExecTime,
-      0,
-    );
-    const slowQueries = patterns.filter(
-      (pattern) => pattern.meanExecTime >= 50,
-    ).length;
+    const totalExecTimeMs = patterns.reduce((total, pattern) => total + pattern.totalExecTime, 0);
+    const slowQueries = patterns.filter((pattern) => pattern.meanExecTime >= 50).length;
 
     return {
       analyzedQueries: patterns.length,
       slowQueries,
       totalExecTimeMs,
-      estimatedImprovementScore: Math.min(
-        100,
-        recommendations.length * 10 + slowQueries * 5,
-      ),
+      estimatedImprovementScore: Math.min(100, recommendations.length * 10 + slowQueries * 5),
     };
   }
 
@@ -327,8 +294,7 @@ export class IndexAnalysisService implements OnModuleInit {
 
     const filterColumns = new Set<string>();
     const filterClause = whereMatch?.[1] || '';
-    const columnMatcher =
-      /([a-z_][\w.]*?)\s*(=|>|<|>=|<=|like|ilike|in|between)/gi;
+    const columnMatcher = /([a-z_][\w.]*?)\s*(=|>|<|>=|<=|like|ilike|in|between)/gi;
 
     let match: RegExpExecArray | null = null;
     while ((match = columnMatcher.exec(filterClause))) {

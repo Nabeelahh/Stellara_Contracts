@@ -1,0 +1,45 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: fraud-model
+  labels:
+    app: fraud-model
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: fraud-model
+  template:
+    metadata:
+      labels:
+        app: fraud-model
+    spec:
+      containers:
+        - name: fraud-model
+          image: stellara/fraud-model:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 4000
+          env:
+            - name: GNN_MODEL_PATH
+              value: /models/gnn.onnx
+          volumeMounts:
+            - name: models
+              mountPath: /models
+      volumes:
+        - name: models
+          emptyDir: {}
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: fraud-model
+spec:
+  selector:
+    app: fraud-model
+  ports:
+    - protocol: TCP
+      port: 4000
+      targetPort: 4000
+  type: ClusterIP

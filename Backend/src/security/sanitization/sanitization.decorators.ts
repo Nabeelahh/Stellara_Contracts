@@ -1,6 +1,12 @@
 import { registerDecorator, ValidationArguments, ValidationOptions } from 'class-validator';
 import { Transform } from 'class-transformer';
-import { sanitizeDeep, containsNoSqlOperators, containsSqlInjection, containsXss, type SanitizationOptions } from './sanitization.utils';
+import {
+  sanitizeDeep,
+  containsNoSqlOperators,
+  containsSqlInjection,
+  containsXss,
+  type SanitizationOptions,
+} from './sanitization.utils';
 
 /**
  * Rejects strings that match conservative SQL injection heuristics.
@@ -53,7 +59,10 @@ export function NoNoSqlOperators(validationOptions?: ValidationOptions) {
  * Sanitizes HTML content using DOM sanitizer and strips script tags by default.
  * If `allowedTags` is provided, only those tags are allowed.
  */
-export function SanitizeHtml(options: SanitizationOptions = {} as SanitizationOptions, validationOptions?: ValidationOptions) {
+export function SanitizeHtml(
+  options: SanitizationOptions = {} as SanitizationOptions,
+  validationOptions?: ValidationOptions,
+) {
   return function (object: object, propertyName: string) {
     // Transform first (so DTO values are cleaned before validation checks).
     Transform(({ value }) => {
@@ -83,4 +92,3 @@ export function SanitizeHtml(options: SanitizationOptions = {} as SanitizationOp
     });
   };
 }
-

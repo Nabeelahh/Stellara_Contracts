@@ -1,9 +1,4 @@
-import {
-  Injectable,
-  ConflictException,
-  NotFoundException,
-  Logger,
-} from '@nestjs/common';
+import { Injectable, ConflictException, NotFoundException, Logger } from '@nestjs/common';
 import { PrismaService } from '../prisma.service';
 import { NotificationService } from '../notification/services/notification.service';
 import { AdvancedCacheService } from '../cache/advanced-cache.service';
@@ -22,10 +17,34 @@ const PLAN_DEFAULTS: Record<
     apiOveragePolicy: ApiOveragePolicy;
   }
 > = {
-  FREE:         { maxUsers: 10,  maxProjects: 5,   apiCallsPerMonthLimit: 100000, storageGbLimit: 100, apiOveragePolicy: 'HARD_STOP' },
-  STARTER:      { maxUsers: 50,  maxProjects: 20,  apiCallsPerMonthLimit: 500000, storageGbLimit: 500, apiOveragePolicy: 'HARD_STOP' },
-  PROFESSIONAL: { maxUsers: 200, maxProjects: 100, apiCallsPerMonthLimit: 2000000, storageGbLimit: 2000, apiOveragePolicy: 'HARD_STOP' },
-  ENTERPRISE:   { maxUsers: 500, maxProjects: 500, apiCallsPerMonthLimit: 10000000, storageGbLimit: 10000, apiOveragePolicy: 'BILL_OVERAGE' },
+  FREE: {
+    maxUsers: 10,
+    maxProjects: 5,
+    apiCallsPerMonthLimit: 100000,
+    storageGbLimit: 100,
+    apiOveragePolicy: 'HARD_STOP',
+  },
+  STARTER: {
+    maxUsers: 50,
+    maxProjects: 20,
+    apiCallsPerMonthLimit: 500000,
+    storageGbLimit: 500,
+    apiOveragePolicy: 'HARD_STOP',
+  },
+  PROFESSIONAL: {
+    maxUsers: 200,
+    maxProjects: 100,
+    apiCallsPerMonthLimit: 2000000,
+    storageGbLimit: 2000,
+    apiOveragePolicy: 'HARD_STOP',
+  },
+  ENTERPRISE: {
+    maxUsers: 500,
+    maxProjects: 500,
+    apiCallsPerMonthLimit: 10000000,
+    storageGbLimit: 10000,
+    apiOveragePolicy: 'BILL_OVERAGE',
+  },
 };
 
 @Injectable()
@@ -49,9 +68,7 @@ export class TenantService {
       where: { OR: [{ name: dto.name }, { slug }] },
     });
     if (existing) {
-      throw new ConflictException(
-        `A tenant with name "${dto.name}" already exists`,
-      );
+      throw new ConflictException(`A tenant with name "${dto.name}" already exists`);
     }
 
     const existingAdmin = await this.prisma.user.findUnique({
@@ -91,17 +108,17 @@ export class TenantService {
       const adminUser = await tx.user.create({
         data: {
           walletAddress: dto.adminWalletAddress,
-          email:         dto.adminEmail,
-          roles:         ['TENANT_ADMIN'],
-          tenantId:      tenant.id,
+          email: dto.adminEmail,
+          roles: ['TENANT_ADMIN'],
+          tenantId: tenant.id,
         },
       });
 
       await tx.tenantAuditLog.create({
         data: {
           tenantId: tenant.id,
-          action:   'TENANT_PROVISIONED',
-          actorId:  actorId ?? null,
+          action: 'TENANT_PROVISIONED',
+          actorId: actorId ?? null,
           metadata: {
             plan,
             adminWalletAddress: dto.adminWalletAddress,
@@ -129,24 +146,26 @@ export class TenantService {
         roles: adminUser.roles,
       })
       .catch((err) =>
-        this.logger.warn(`Failed to publish UserCreated event for tenant ${tenant.id}: ${err.message}`),
+        this.logger.warn(
+          `Failed to publish UserCreated event for tenant ${tenant.id}: ${err.message}`,
+        ),
       );
 
     this.logger.log(`Tenant provisioned: ${tenant.id} (${tenant.slug})`);
 
     return {
       tenant: {
-        id:        tenant.id,
-        name:      tenant.name,
-        slug:      tenant.slug,
-        plan:      tenant.plan,
-        status:    tenant.status,
+        id: tenant.id,
+        name: tenant.name,
+        slug: tenant.slug,
+        plan: tenant.plan,
+        status: tenant.status,
         createdAt: tenant.createdAt,
       },
       adminUser: {
-        id:            adminUser.id,
+        id: adminUser.id,
         walletAddress: adminUser.walletAddress,
-        roles:         adminUser.roles,
+        roles: adminUser.roles,
       },
     };
   }
@@ -175,8 +194,8 @@ export class TenantService {
     const toApiShape = (s: any) => ({
       ...s,
       // Normalize Date objects so JSON-cached values have stable shape.
-      createdAt: s.createdAt ? s.createdAt.toISOString?.() ?? s.createdAt : null,
-      updatedAt: s.updatedAt ? s.updatedAt.toISOString?.() ?? s.updatedAt : null,
+      createdAt: s.createdAt ? (s.createdAt.toISOString?.() ?? s.createdAt) : null,
+      updatedAt: s.updatedAt ? (s.updatedAt.toISOString?.() ?? s.updatedAt) : null,
     });
 
     return this.cache.getOrSet(
@@ -204,7 +223,7 @@ export class TenantService {
     await this.prisma.tenantAuditLog.create({
       data: {
         tenantId,
-        action:  'SETTINGS_UPDATED',
+        action: 'SETTINGS_UPDATED',
         actorId: actorId ?? null,
         metadata: dto as object,
       },

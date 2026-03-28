@@ -114,14 +114,7 @@ export class BackupService implements OnModuleInit {
 
       // Create backup using pg_basebackup for full backups
       if (job.type === BackupType.FULL) {
-        await this.createFullBackup(
-          localPath,
-          dbHost,
-          dbPort,
-          dbUser,
-          dbName,
-          dbPassword,
-        );
+        await this.createFullBackup(localPath, dbHost, dbPort, dbUser, dbName, dbPassword);
       } else {
         throw new Error(`Backup type ${job.type} not yet implemented`);
       }
@@ -207,10 +200,7 @@ export class BackupService implements OnModuleInit {
   /**
    * Upload backup to S3
    */
-  private async uploadToS3(
-    localPath: string,
-    fileName: string,
-  ): Promise<string> {
+  private async uploadToS3(localPath: string, fileName: string): Promise<string> {
     const bucket = this.configService.get('S3_BACKUP_BUCKET');
     const prefix = this.configService.get('S3_BACKUP_PREFIX', 'postgresql');
     const region = this.configService.get('AWS_REGION', 'us-east-1');
@@ -267,9 +257,7 @@ export class BackupService implements OnModuleInit {
       fs.unlinkSync(tempPath);
 
       if (downloadedChecksum !== job.checksum) {
-        throw new Error(
-          `Checksum mismatch: expected ${job.checksum}, got ${downloadedChecksum}`,
-        );
+        throw new Error(`Checksum mismatch: expected ${job.checksum}, got ${downloadedChecksum}`);
       }
 
       job.status = BackupStatus.VERIFIED;
@@ -287,7 +275,9 @@ export class BackupService implements OnModuleInit {
    */
   getBackupStatus(): BackupStatusDto {
     const jobs = Array.from(this.backupJobs.values());
-    const completedJobs = jobs.filter((j) => j.status === BackupStatus.COMPLETED || j.status === BackupStatus.VERIFIED);
+    const completedJobs = jobs.filter(
+      (j) => j.status === BackupStatus.COMPLETED || j.status === BackupStatus.VERIFIED,
+    );
 
     const lastBackup = completedJobs.sort(
       (a, b) => b.completedAt!.getTime() - a.completedAt!.getTime(),
@@ -372,9 +362,7 @@ export class BackupService implements OnModuleInit {
       // Delete old objects
       for (const key of keysToDelete) {
         try {
-          await execAsync(
-            `aws s3 rm "s3://${bucket}/${key}" --region ${region}`,
-          );
+          await execAsync(`aws s3 rm "s3://${bucket}/${key}" --region ${region}`);
           this.logger.log(`Deleted old backup: ${key}`);
         } catch (error) {
           this.logger.error(`Failed to delete ${key}:`, error);

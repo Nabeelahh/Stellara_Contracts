@@ -1,0 +1,36 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: fraud-scorer
+  labels:
+    app: fraud-scorer
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: fraud-scorer
+  template:
+    metadata:
+      labels:
+        app: fraud-scorer
+    spec:
+      containers:
+        - name: fraud-scorer
+          image: stellara/fraud-scorer:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 3001
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: fraud-scorer
+spec:
+  selector:
+    app: fraud-scorer
+  ports:
+    - protocol: TCP
+      port: 3001
+      targetPort: 3001
+  type: ClusterIP

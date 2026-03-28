@@ -1,11 +1,4 @@
-import {
-  Controller,
-  Delete,
-  Get,
-  Param,
-  Req,
-  UseGuards,
-} from '@nestjs/common';
+import { Controller, Delete, Get, Param, Req, UseGuards } from '@nestjs/common';
 import { Request } from 'express';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -37,10 +30,7 @@ export class SessionsController {
   }
 
   @Delete(':id')
-  async terminateSession(
-    @CurrentUser() user: any,
-    @Param('id') sessionId: string,
-  ) {
+  async terminateSession(@CurrentUser() user: any, @Param('id') sessionId: string) {
     await this.sessionService.terminateSession(user.id, sessionId);
     return { sessionId, terminated: true };
   }
@@ -51,10 +41,7 @@ export class SessionsController {
     @Param('id') sessionId: string,
     @Req() req: Request,
   ) {
-    const sessions = await this.sessionService.listSessions(
-      user.id,
-      req.user?.sessionId,
-    );
+    const sessions = await this.sessionService.listSessions(user.id, req.user?.sessionId);
     const session = sessions.find((entry) => entry.sessionId === sessionId);
 
     if (!session) {

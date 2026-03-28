@@ -40,7 +40,7 @@ export class EventListenerService extends EventEmitter {
     super();
     this.stellarServer = new StellarSdk.Server(
       process.env.STELLAR_HORIZON_URL || 'https://horizon.stellar.org',
-      { allowHttp: false }
+      { allowHttp: false },
     );
   }
 
@@ -84,7 +84,7 @@ export class EventListenerService extends EventEmitter {
   async backfillEvents(
     fromLedger: number,
     toLedger?: number,
-    contractIds: string[] = []
+    contractIds: string[] = [],
   ): Promise<SorobanEvent[]> {
     this.logger.log(`Backfilling events from ledger ${fromLedger} to ${toLedger || 'latest'}`);
 
@@ -106,7 +106,7 @@ export class EventListenerService extends EventEmitter {
 
         const transactionEvents = await this.extractEventsFromTransactions(
           response.records,
-          contractIds
+          contractIds,
         );
 
         events.push(...transactionEvents);
@@ -132,24 +132,18 @@ export class EventListenerService extends EventEmitter {
     while (this.isListening) {
       try {
         const callBuilder = this.stellarServer.transactions();
-        
+
         if (this.currentCursor) {
           callBuilder.cursor(this.currentCursor);
         }
 
-        const response = await callBuilder
-          .limit(100)
-          .order('asc')
-          .call();
+        const response = await callBuilder.limit(100).order('asc').call();
 
         if (response.records.length > 0) {
-          const events = await this.extractEventsFromTransactions(
-            response.records,
-            contractIds
-          );
+          const events = await this.extractEventsFromTransactions(response.records, contractIds);
 
           // Emit events for processing
-          events.forEach(event => {
+          events.forEach((event) => {
             this.emit('sorobanEvent', event);
           });
 
@@ -163,7 +157,6 @@ export class EventListenerService extends EventEmitter {
 
         // Wait before next poll
         await this.sleep(1000); // 1 second
-
       } catch (error) {
         this.logger.error('Error in event stream:', error);
         await this.handleStreamError(error);
@@ -173,7 +166,7 @@ export class EventListenerService extends EventEmitter {
 
   private async extractEventsFromTransactions(
     transactions: any[],
-    contractIds: string[]
+    contractIds: string[],
   ): Promise<SorobanEvent[]> {
     const events: SorobanEvent[] = [];
 
@@ -184,11 +177,7 @@ export class EventListenerService extends EventEmitter {
 
       for (const op of tx.operations) {
         if (op.type === 'invoke_host_function' && op.value?.effects) {
-          const sorobanEvents = this.parseSorobanEvents(
-            op.value.effects,
-            tx,
-            contractIds
-          );
+          const sorobanEvents = this.parseSorobanEvents(op.value.effects, tx, contractIds);
           events.push(...sorobanEvents);
         }
       }
@@ -200,7 +189,7 @@ export class EventListenerService extends EventEmitter {
   private parseSorobanEvents(
     effects: any[],
     transaction: any,
-    contractIds: string[]
+    contractIds: string[],
   ): SorobanEvent[] {
     const events: SorobanEvent[] = [];
 
@@ -219,11 +208,11 @@ export class EventListenerService extends EventEmitter {
   private parseContractEvent(
     effect: any,
     transaction: any,
-    contractIds: string[]
+    contractIds: string[],
   ): SorobanEvent | null {
     try {
       const contractId = effect.contract_id || effect.value?.contract_id;
-      
+
       // Filter by contract IDs if specified
       if (contractIds.length > 0 && !contractIds.includes(contractId)) {
         return null;
@@ -257,7 +246,9 @@ export class EventListenerService extends EventEmitter {
     }
 
     const delay = this.reconnectDelay * Math.pow(2, this.reconnectAttempts - 1);
-    this.logger.warn(`Reconnection attempt ${this.reconnectAttempts}/${this.maxReconnectAttempts} in ${delay}ms`);
+    this.logger.warn(
+      `Reconnection attempt ${this.reconnectAttempts}/${this.maxReconnectAttempts} in ${delay}ms`,
+    );
 
     await this.sleep(delay);
   }
@@ -297,7 +288,7 @@ export class EventListenerService extends EventEmitter {
   }
 
   private sleep(ms: number): Promise<void> {
-    return new Promise(resolve => setTimeout(resolve, ms));
+    return new Promise((resolve) => setTimeout(resolve, ms));
   }
 
   getCurrentCursor(): string | null {

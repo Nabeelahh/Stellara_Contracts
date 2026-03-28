@@ -15,10 +15,7 @@ export class EncryptionGuard implements CanActivate {
     const handler = context.getHandler();
 
     // Check if handler requires encryption
-    const requiresEncryption = this.reflector.get<boolean>(
-      'requires_encryption',
-      handler,
-    );
+    const requiresEncryption = this.reflector.get<boolean>('requires_encryption', handler);
 
     if (!requiresEncryption) {
       return true;
@@ -41,6 +38,7 @@ export class EncryptionGuard implements CanActivate {
 /**
  * Decorator to mark routes as requiring encryption
  */
-export const RequiresEncryption = () => (target: any, propertyKey: string, descriptor: PropertyDescriptor) => {
-  Reflect.defineMetadata('requires_encryption', true, target, propertyKey);
-};
+export const RequiresEncryption =
+  () => (target: any, propertyKey: string, descriptor: PropertyDescriptor) => {
+    Reflect.defineMetadata('requires_encryption', true, target, propertyKey);
+  };

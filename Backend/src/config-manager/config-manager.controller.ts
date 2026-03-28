@@ -9,7 +9,16 @@ import {
   UseGuards,
   Request,
 } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse, ApiParam, ApiQuery, ApiBearerAuth, ApiBody, ApiOkResponse } from '@nestjs/swagger';
+import {
+  ApiTags,
+  ApiOperation,
+  ApiResponse,
+  ApiParam,
+  ApiQuery,
+  ApiBearerAuth,
+  ApiBody,
+  ApiOkResponse,
+} from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { RolesGuard } from '../auth/guards/roles.guard';
@@ -33,9 +42,9 @@ export class ConfigManagerController {
   // ─── Config entries ───────────────────────────────────────────────────────
 
   @Get('resolve')
-  @ApiOperation({ 
+  @ApiOperation({
     summary: 'Resolve configuration value',
-    description: 'Resolves a configuration value considering tenant and user context'
+    description: 'Resolves a configuration value considering tenant and user context',
   })
   @ApiQuery({
     name: 'key',
@@ -75,9 +84,9 @@ export class ConfigManagerController {
 
   @Post()
   @Roles('ADMIN' as any)
-  @ApiOperation({ 
+  @ApiOperation({
     summary: 'Set configuration value',
-    description: 'Creates or updates a configuration entry. Requires ADMIN role.'
+    description: 'Creates or updates a configuration entry. Requires ADMIN role.',
   })
   @ApiBody({ type: SetConfigDto })
   @ApiOkResponse({
@@ -97,9 +106,9 @@ export class ConfigManagerController {
 
   @Delete(':key')
   @Roles('ADMIN' as any)
-  @ApiOperation({ 
+  @ApiOperation({
     summary: 'Delete configuration entry',
-    description: 'Deletes a configuration entry. Requires ADMIN role.'
+    description: 'Deletes a configuration entry. Requires ADMIN role.',
   })
   @ApiParam({
     name: 'key',
@@ -145,9 +154,9 @@ export class ConfigManagerController {
 
   @Get('tenant/:tenantId')
   @Roles('ADMIN' as any)
-  @ApiOperation({ 
+  @ApiOperation({
     summary: 'List tenant configurations',
-    description: 'Lists all configuration entries for a tenant. Requires ADMIN role.'
+    description: 'Lists all configuration entries for a tenant. Requires ADMIN role.',
   })
   @ApiParam({
     name: 'tenantId',
@@ -166,9 +175,9 @@ export class ConfigManagerController {
   // ─── Feature flags ────────────────────────────────────────────────────────
 
   @Get('flags')
-  @ApiOperation({ 
+  @ApiOperation({
     summary: 'List feature flags',
-    description: 'Lists all feature flags, optionally filtered by tenant'
+    description: 'Lists all feature flags, optionally filtered by tenant',
   })
   @ApiQuery({
     name: 'tenantId',
@@ -184,9 +193,9 @@ export class ConfigManagerController {
   }
 
   @Get('flags/:key')
-  @ApiOperation({ 
+  @ApiOperation({
     summary: 'Check feature flag status',
-    description: 'Checks if a feature flag is enabled for the given context'
+    description: 'Checks if a feature flag is enabled for the given context',
   })
   @ApiParam({
     name: 'key',
@@ -224,9 +233,9 @@ export class ConfigManagerController {
 
   @Post('flags')
   @Roles('ADMIN' as any)
-  @ApiOperation({ 
+  @ApiOperation({
     summary: 'Set feature flag',
-    description: 'Creates or updates a feature flag. Requires ADMIN role.'
+    description: 'Creates or updates a feature flag. Requires ADMIN role.',
   })
   @ApiBody({ type: SetFeatureFlagDto })
   @ApiOkResponse({
@@ -240,9 +249,9 @@ export class ConfigManagerController {
 
   @Delete('flags/:key')
   @Roles('ADMIN' as any)
-  @ApiOperation({ 
+  @ApiOperation({
     summary: 'Delete feature flag',
-    description: 'Deletes a feature flag. Requires ADMIN role.'
+    description: 'Deletes a feature flag. Requires ADMIN role.',
   })
   @ApiParam({
     name: 'key',
@@ -277,9 +286,9 @@ export class ConfigManagerController {
 
   @Get('audit/:key')
   @Roles('ADMIN' as any)
-  @ApiOperation({ 
+  @ApiOperation({
     summary: 'Get configuration audit trail',
-    description: 'Retrieves the audit history for a configuration key. Requires ADMIN role.'
+    description: 'Retrieves the audit history for a configuration key. Requires ADMIN role.',
   })
   @ApiParam({
     name: 'key',
@@ -296,10 +305,7 @@ export class ConfigManagerController {
     type: Array,
   })
   @ApiResponse({ status: 403, description: 'Forbidden - Admin role required' })
-  async getAuditTrail(
-    @Param('key') key: string,
-    @Query('tenantId') tenantId?: string,
-  ) {
+  async getAuditTrail(@Param('key') key: string, @Query('tenantId') tenantId?: string) {
     return this.audit.getAuditTrail(key, tenantId);
   }
 }

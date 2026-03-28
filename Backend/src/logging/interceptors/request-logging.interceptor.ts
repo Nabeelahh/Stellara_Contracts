@@ -198,7 +198,7 @@ export class RequestLoggingInterceptor implements NestInterceptor {
   private getClientIp(request: Request): string {
     const forwardedFor = request.headers['x-forwarded-for'];
     const forwardedForStr = Array.isArray(forwardedFor) ? forwardedFor[0] : forwardedFor;
-    
+
     return (
       forwardedForStr?.split(',')[0]?.trim() ||
       request.headers['x-real-ip']?.toString() ||

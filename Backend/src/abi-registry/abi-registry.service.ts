@@ -1,15 +1,12 @@
-import {
-  BadRequestException,
-  Injectable,
-  NotFoundException,
-} from '@nestjs/common';
-import { PrismaService } from '../prisma.service';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import {
   DecodeContractResultDto,
   ParseContractEventDto,
   PrepareInvocationDto,
   UpsertAbiRegistryDto,
 } from './dto/abi-registry.dto';
+
+import { PrismaService } from '../prisma.service';
 
 type JsonObject = Record<string, any>;
 
@@ -20,9 +17,9 @@ interface ResolvedAbiVersion {
 
 @Injectable()
 export class AbiRegistryService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(private readonly prisma: PrismaService) { }
 
-  async listRegistries() {
+  async listRegistries () {
     const registries = await this.prisma.contractAbiRegistry.findMany({
       include: {
         versions: {
@@ -45,24 +42,22 @@ export class AbiRegistryService {
         registry.versions[0]?.version,
       version: (() => {
         const activeVersion =
-          registry.versions.find(
-            (entry) => entry.version === registry.currentVersion,
-          ) ||
+          registry.versions.find((entry) => entry.version === registry.currentVersion) ||
           registry.versions.find((entry) => entry.isCurrent) ||
           registry.versions[0];
 
         return activeVersion
           ? {
-              id: activeVersion.id,
-              version: activeVersion.version,
-              isCurrent: activeVersion.isCurrent,
-              isDeprecated: activeVersion.isDeprecated,
-              abiSchema: activeVersion.abiSchema,
-              contractSchema: activeVersion.contractSchema,
-              functionSchemas: activeVersion.functionSchemas,
-              eventSchemas: activeVersion.eventSchemas,
-              changelog: activeVersion.changelog,
-            }
+            id: activeVersion.id,
+            version: activeVersion.version,
+            isCurrent: activeVersion.isCurrent,
+            isDeprecated: activeVersion.isDeprecated,
+            abiSchema: activeVersion.abiSchema,
+            contractSchema: activeVersion.contractSchema,
+            functionSchemas: activeVersion.functionSchemas,
+            eventSchemas: activeVersion.eventSchemas,
+            changelog: activeVersion.changelog,
+          }
           : null;
       })(),
       versions: registry.versions.map((version) => ({
@@ -76,12 +71,12 @@ export class AbiRegistryService {
     }));
   }
 
-  async getRegistry(contractAddress: string, version?: string) {
+  async getRegistry (contractAddress: string, version?: string) {
     const resolved = await this.resolveRegistryVersion(contractAddress, version);
     return this.toRegistryResponse(resolved);
   }
 
-  async upsertRegistry(actorId: string | undefined, dto: UpsertAbiRegistryDto) {
+  async upsertRegistry (actorId: string | undefined, dto: UpsertAbiRegistryDto) {
     this.validateSchemaPayload(dto);
 
     const markAsCurrent = dto.markAsCurrent !== false;
@@ -92,30 +87,30 @@ export class AbiRegistryService {
 
     const registry = existingRegistry
       ? await this.prisma.contractAbiRegistry.update({
-          where: { contractAddress: dto.contractAddress },
-          data: {
-            contractType: dto.contractType,
-            displayName: dto.displayName,
-            description: dto.description,
-            network: dto.network ?? existingRegistry.network,
-            metadata: dto.metadata ?? existingRegistry.metadata ?? undefined,
-            updatedBy: actorId,
-            ...(markAsCurrent ? { currentVersion: dto.version } : {}),
-          },
-        })
+        where: { contractAddress: dto.contractAddress },
+        data: {
+          contractType: dto.contractType,
+          displayName: dto.displayName,
+          description: dto.description,
+          network: dto.network ?? existingRegistry.network,
+          metadata: (dto.metadata as never) ?? existingRegistry.metadata ?? undefined,
+          updatedBy: actorId,
+          ...(markAsCurrent ? { currentVersion: dto.version } : {}),
+        },
+      })
       : await this.prisma.contractAbiRegistry.create({
-          data: {
-            contractAddress: dto.contractAddress,
-            contractType: dto.contractType,
-            displayName: dto.displayName,
-            description: dto.description,
-            network: dto.network ?? 'stellar',
-            metadata: dto.metadata,
-            createdBy: actorId,
-            updatedBy: actorId,
-            currentVersion: markAsCurrent ? dto.version : null,
-          },
-        });
+        data: {
+          contractAddress: dto.contractAddress,
+          contractType: dto.contractType,
+          displayName: dto.displayName as never,
+          description: dto.description as never,
+          network: dto.network ?? 'stellar',
+          metadata: dto.metadata as never,
+          createdBy: actorId,
+          updatedBy: actorId,
+          currentVersion: markAsCurrent ? dto.version : null,
+        },
+      });
 
     const existingVersion = await this.prisma.contractAbiVersion.findFirst({
       where: {
@@ -133,32 +128,32 @@ export class AbiRegistryService {
 
     const versionRecord = existingVersion
       ? await this.prisma.contractAbiVersion.update({
-          where: { id: existingVersion.id },
-          data: {
-            abiSchema: dto.abiSchema,
-            contractSchema: dto.contractSchema,
-            functionSchemas: this.normalizeFunctionSchemas(dto),
-            eventSchemas: this.normalizeEventSchemas(dto),
-            compatibility: dto.compatibility,
-            changelog: dto.changelog,
-            createdBy: actorId ?? existingVersion.createdBy,
-            isCurrent: markAsCurrent,
-          },
-        })
+        where: { id: existingVersion.id },
+        data: {
+          abiSchema: dto.abiSchema as never,
+          contractSchema: dto.contractSchema as never,
+          functionSchemas: this.normalizeFunctionSchemas(dto),
+          eventSchemas: this.normalizeEventSchemas(dto),
+          compatibility: dto.compatibility as never,
+          changelog: dto.changelog,
+          createdBy: actorId ?? existingVersion.createdBy,
+          isCurrent: markAsCurrent,
+        },
+      })
       : await this.prisma.contractAbiVersion.create({
-          data: {
-            registryId: registry.id,
-            version: dto.version,
-            abiSchema: dto.abiSchema,
-            contractSchema: dto.contractSchema,
-            functionSchemas: this.normalizeFunctionSchemas(dto),
-            eventSchemas: this.normalizeEventSchemas(dto),
-            compatibility: dto.compatibility,
-            changelog: dto.changelog,
-            createdBy: actorId,
-            isCurrent: markAsCurrent,
-          },
-        });
+        data: {
+          registryId: registry.id,
+          version: dto.version,
+          abiSchema: dto.abiSchema as never,
+          contractSchema: dto.contractSchema as never,
+          functionSchemas: this.normalizeFunctionSchemas(dto),
+          eventSchemas: this.normalizeEventSchemas(dto),
+          compatibility: dto.compatibility as never,
+          changelog: dto.changelog,
+          createdBy: actorId,
+          isCurrent: markAsCurrent,
+        },
+      });
 
     return this.toRegistryResponse({
       registry,
@@ -166,7 +161,7 @@ export class AbiRegistryService {
     });
   }
 
-  async prepareInvocation(contractAddress: string, dto: PrepareInvocationDto) {
+  async prepareInvocation (contractAddress: string, dto: PrepareInvocationDto) {
     const resolved = await this.resolveRegistryVersion(contractAddress, dto.version);
     const functionSchema = this.getFunctionSchema(resolved.version, dto.functionName);
     const argumentMap = Object.fromEntries(
@@ -198,7 +193,7 @@ export class AbiRegistryService {
     };
   }
 
-  async decodeContractResult(contractAddress: string, dto: DecodeContractResultDto) {
+  async decodeContractResult (contractAddress: string, dto: DecodeContractResultDto) {
     const resolved = await this.resolveRegistryVersion(contractAddress, dto.version);
     const functionSchema = this.getFunctionSchema(resolved.version, dto.functionName);
     const outputs = functionSchema.outputs ?? [];
@@ -223,16 +218,15 @@ export class AbiRegistryService {
     };
   }
 
-  async parseContractEvent(contractAddress: string, dto: ParseContractEventDto) {
+  async parseContractEvent (contractAddress: string, dto: ParseContractEventDto) {
     const resolved = await this.resolveRegistryVersion(contractAddress, dto.version);
     const eventName = dto.eventName || this.deriveEventName(dto.topics, dto.data);
     const eventSchema = this.getEventSchema(resolved.version, eventName);
     const payload = this.normalizePayload(dto.data);
 
-    const decodedEntries = Object.entries(eventSchema.fields ?? {}).map(([fieldName, descriptor]) => [
-      fieldName,
-      this.decodeValue(payload[fieldName], descriptor),
-    ]);
+    const decodedEntries = Object.entries(eventSchema.fields ?? {}).map(
+      ([fieldName, descriptor]) => [fieldName, this.decodeValue(payload[fieldName], descriptor)],
+    );
 
     return {
       contractAddress,
@@ -244,7 +238,7 @@ export class AbiRegistryService {
     };
   }
 
-  async parseIndexedEvent(event: {
+  async parseIndexedEvent (event: {
     contractId: string;
     topic?: string[];
     data?: unknown;
@@ -257,7 +251,7 @@ export class AbiRegistryService {
     });
   }
 
-  private async resolveRegistryVersion(
+  private async resolveRegistryVersion (
     contractAddress: string,
     version?: string,
   ): Promise<ResolvedAbiVersion> {
@@ -286,7 +280,7 @@ export class AbiRegistryService {
     return { registry, version: resolvedVersion };
   }
 
-  private getFunctionSchema(version: any, functionName: string): JsonObject {
+  private getFunctionSchema (version: any, functionName: string): JsonObject {
     const functions = (version.functionSchemas ?? {}) as JsonObject;
     const schema = functions[functionName];
 
@@ -299,7 +293,7 @@ export class AbiRegistryService {
     return schema;
   }
 
-  private getEventSchema(version: any, eventName: string): JsonObject {
+  private getEventSchema (version: any, eventName: string): JsonObject {
     const events = (version.eventSchemas ?? {}) as JsonObject;
     const schema = events[eventName];
 
@@ -312,7 +306,7 @@ export class AbiRegistryService {
     return schema;
   }
 
-  private normalizeFunctionSchemas(dto: UpsertAbiRegistryDto): JsonObject {
+  private normalizeFunctionSchemas (dto: UpsertAbiRegistryDto): JsonObject {
     if (dto.functionSchemas && Object.keys(dto.functionSchemas).length > 0) {
       return dto.functionSchemas as JsonObject;
     }
@@ -320,7 +314,7 @@ export class AbiRegistryService {
     return this.extractSchemasFromAbi(dto.abiSchema, 'function');
   }
 
-  private normalizeEventSchemas(dto: UpsertAbiRegistryDto): JsonObject {
+  private normalizeEventSchemas (dto: UpsertAbiRegistryDto): JsonObject {
     if (dto.eventSchemas && Object.keys(dto.eventSchemas).length > 0) {
       return dto.eventSchemas as JsonObject;
     }
@@ -328,7 +322,7 @@ export class AbiRegistryService {
     return this.extractSchemasFromAbi(dto.abiSchema, 'event');
   }
 
-  private extractSchemasFromAbi(abiSchema: Record<string, unknown>, kind: 'function' | 'event') {
+  private extractSchemasFromAbi (abiSchema: Record<string, unknown>, kind: 'function' | 'event') {
     const entries = Array.isArray((abiSchema as any)?.spec?.entries)
       ? ((abiSchema as any).spec.entries as JsonObject[])
       : [];
@@ -349,7 +343,7 @@ export class AbiRegistryService {
     }, {});
   }
 
-  private validateSchemaPayload(dto: UpsertAbiRegistryDto): void {
+  private validateSchemaPayload (dto: UpsertAbiRegistryDto): void {
     const functionSchemas = this.normalizeFunctionSchemas(dto);
     const eventSchemas = this.normalizeEventSchemas(dto);
 
@@ -366,7 +360,7 @@ export class AbiRegistryService {
     }
   }
 
-  private toRegistryResponse(resolved: ResolvedAbiVersion) {
+  private toRegistryResponse (resolved: ResolvedAbiVersion) {
     return {
       id: resolved.registry.id,
       contractAddress: resolved.registry.contractAddress,
@@ -390,7 +384,7 @@ export class AbiRegistryService {
     };
   }
 
-  private compareVersions(left: string, right: string): number {
+  private compareVersions (left: string, right: string): number {
     const leftParts = left.split('.').map((part) => Number(part) || 0);
     const rightParts = right.split('.').map((part) => Number(part) || 0);
     const length = Math.max(leftParts.length, rightParts.length);
@@ -405,7 +399,7 @@ export class AbiRegistryService {
     return 0;
   }
 
-  private deriveEventName(topics?: string[], data?: unknown): string {
+  private deriveEventName (topics?: string[], data?: unknown): string {
     if (topics?.length) {
       try {
         return Buffer.from(topics[0], 'base64').toString('utf8') || topics[0];
@@ -418,7 +412,7 @@ export class AbiRegistryService {
     return String(payload.eventName ?? payload.name ?? 'unknown');
   }
 
-  private normalizePayload(data: unknown): JsonObject {
+  private normalizePayload (data: unknown): JsonObject {
     if (data && typeof data === 'object' && !Array.isArray(data)) {
       return data as JsonObject;
     }
@@ -435,7 +429,7 @@ export class AbiRegistryService {
     return { value: data };
   }
 
-  private decodeValue(value: unknown, descriptor: any): unknown {
+  private decodeValue (value: unknown, descriptor: any): unknown {
     const typeName = String(descriptor?.type ?? descriptor ?? 'string').toLowerCase();
 
     if (value === null || value === undefined) {
@@ -457,9 +451,7 @@ export class AbiRegistryService {
       typeName === 'int'
     ) {
       const normalized = typeof value === 'string' ? Number(value) : value;
-      return typeof normalized === 'number' && Number.isFinite(normalized)
-        ? normalized
-        : value;
+      return typeof normalized === 'number' && Number.isFinite(normalized) ? normalized : value;
     }
 
     if (typeName === 'array' && Array.isArray(value)) {
@@ -467,18 +459,25 @@ export class AbiRegistryService {
       return value.map((item) => this.decodeValue(item, itemDescriptor));
     }
 
-    if ((typeName === 'object' || typeName === 'struct' || descriptor.fields) && value && typeof value === 'object') {
+    if (
+      (typeName === 'object' || typeName === 'struct' || descriptor.fields) &&
+      value &&
+      typeof value === 'object'
+    ) {
       const fields = descriptor.fields ?? {};
-      return Object.entries(value as JsonObject).reduce<JsonObject>((accumulator, [key, fieldValue]) => {
-        accumulator[key] = this.decodeValue(fieldValue, fields[key] ?? { type: 'string' });
-        return accumulator;
-      }, {});
+      return Object.entries(value as JsonObject).reduce<JsonObject>(
+        (accumulator, [key, fieldValue]) => {
+          accumulator[key] = this.decodeValue(fieldValue, fields[key] ?? { type: 'string' });
+          return accumulator;
+        },
+        {},
+      );
     }
 
     return value;
   }
 
-  private validateAgainstTypeDescriptor(value: unknown, descriptor: any, fieldName: string): void {
+  private validateAgainstTypeDescriptor (value: unknown, descriptor: any, fieldName: string): void {
     const typeName = String(descriptor?.type ?? descriptor ?? 'string').toLowerCase();
 
     if (value === undefined || value === null) {
@@ -500,7 +499,10 @@ export class AbiRegistryService {
       throw new BadRequestException(`Argument ${fieldName} must be an array.`);
     }
 
-    if ((typeName === 'object' || typeName === 'struct') && (typeof value !== 'object' || Array.isArray(value))) {
+    if (
+      (typeName === 'object' || typeName === 'struct') &&
+      (typeof value !== 'object' || Array.isArray(value))
+    ) {
       throw new BadRequestException(`Argument ${fieldName} must be an object.`);
     }
   }

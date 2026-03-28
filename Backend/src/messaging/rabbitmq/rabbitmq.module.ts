@@ -12,4 +12,3 @@ import { WebhooksModule } from '../../webhooks/webhooks.module';
   exports: [EventBusService],
 })
 export class RabbitmqModule {}
-

@@ -31,14 +31,13 @@ export class GlobalExceptionFilter implements ExceptionFilter {
       // Handle our custom HTTP exceptions
       errorResponse = exception.getResponse();
       httpStatus = exception.httpStatus;
-      
+
       this.logError(exception, request, 'Custom HTTP Exception');
-      
     } else if (exception instanceof HttpException) {
       // Handle NestJS HTTP exceptions
       const status = exception.getStatus();
       const response = exception.getResponse();
-      
+
       errorResponse = {
         success: false,
         error: {
@@ -50,15 +49,14 @@ export class GlobalExceptionFilter implements ExceptionFilter {
           ...(typeof response === 'object' && response !== null ? { details: response } : {}),
         },
       };
-      
+
       httpStatus = status;
-      
+
       this.logError(exception, request, 'NestJS HTTP Exception');
-      
     } else if (exception instanceof Error) {
       // Handle generic errors
       const isProduction = this.configService.get('NODE_ENV') === 'production';
-      
+
       errorResponse = {
         success: false,
         error: {
@@ -67,25 +65,28 @@ export class GlobalExceptionFilter implements ExceptionFilter {
           timestamp: new Date().toISOString(),
           path: request.url,
           requestId: this.getRequestId(request),
-          ...(isProduction ? {} : { 
-            details: [{
-              field: 'stack',
-              code: 'STACK_TRACE',
-              message: exception.stack,
-              timestamp: new Date().toISOString(),
-            }]
-          }),
+          ...(isProduction
+            ? {}
+            : {
+                details: [
+                  {
+                    field: 'stack',
+                    code: 'STACK_TRACE',
+                    message: exception.stack,
+                    timestamp: new Date().toISOString(),
+                  },
+                ],
+              }),
         },
       };
-      
+
       httpStatus = HttpStatus.INTERNAL_SERVER_ERROR;
-      
+
       this.logError(exception, request, 'Generic Error');
-      
     } else {
       // Handle unknown exceptions
       const isProduction = this.configService.get('NODE_ENV') === 'production';
-      
+
       errorResponse = {
         success: false,
         error: {
@@ -96,9 +97,9 @@ export class GlobalExceptionFilter implements ExceptionFilter {
           requestId: this.getRequestId(request),
         },
       };
-      
+
       httpStatus = HttpStatus.INTERNAL_SERVER_ERROR;
-      
+
       this.logError(exception, request, 'Unknown Exception');
     }
 
@@ -112,20 +113,23 @@ export class GlobalExceptionFilter implements ExceptionFilter {
   private addSecurityHeaders(response: Response): void {
     // Prevent content type sniffing
     response.setHeader('X-Content-Type-Options', 'nosniff');
-    
+
     // Prevent clickjacking
     response.setHeader('X-Frame-Options', 'DENY');
-    
+
     // Prevent XSS
     response.setHeader('X-XSS-Protection', '1; mode=block');
-    
+
     // HSTS
     if (this.configService.get('NODE_ENV') === 'production') {
       response.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
     }
-    
+
     // CORS (if not handled by CORS middleware)
-    response.setHeader('Access-Control-Allow-Origin', this.configService.get('ALLOWED_ORIGINS', '*'));
+    response.setHeader(
+      'Access-Control-Allow-Origin',
+      this.configService.get('ALLOWED_ORIGINS', '*'),
+    );
     response.setHeader('Access-Control-Allow-Methods', 'GET,HEAD,PUT,PATCH,POST,DELETE');
     response.setHeader('Access-Control-Allow-Headers', 'Content-Type,Authorization,X-Request-ID');
   }
@@ -154,7 +158,7 @@ export class GlobalExceptionFilter implements ExceptionFilter {
     const userId = request.user?.id || 'anonymous';
     const ip = this.getClientIP(request);
     const userAgent = request.headers['user-agent'];
-    
+
     const logData = {
       requestId,
       userId,
@@ -169,10 +173,11 @@ export class GlobalExceptionFilter implements ExceptionFilter {
     };
 
     // Log based on error severity
-    const httpStatus = exception instanceof BaseHttpException 
-      ? exception.httpStatus 
-      : HttpStatus.INTERNAL_SERVER_ERROR;
-    
+    const httpStatus =
+      exception instanceof BaseHttpException
+        ? exception.httpStatus
+        : HttpStatus.INTERNAL_SERVER_ERROR;
+
     if (httpStatus >= 500) {
       this.logger.error(`[${type}] ${exception.message}`, logData);
     } else if (httpStatus >= 400) {
@@ -200,7 +205,7 @@ export class GlobalExceptionFilter implements ExceptionFilter {
   private sendToMonitoring(logData: any, exception: Error): void {
     // Send to external monitoring services like Sentry, DataDog, etc.
     // This would be implemented based on your monitoring setup
-    
+
     try {
       // Example: Send to Sentry
       if (process.env.SENTRY_DSN) {

@@ -1,0 +1,205 @@
+# PostgreSQL Logical Replication Setup for Multi-Cloud
+# This configuration enables cross-cloud database replication
+
+# Primary Database (AWS us-east-1)
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: postgres-primary-config
+  namespace: stellara-backend
+data:
+  postgresql.conf: |
+    # Primary database configuration
+    listen_addresses = '*'
+    wal_level = logical
+    max_wal_senders = 10
+    max_replication_slots = 10
+    max_connections = 100
+    shared_preload_libraries = 'pg_stat_statements'
+    # Archive settings for backup
+    archive_mode = on
+    archive_command = '/usr/local/bin/wal-archive.sh %p %f'
+
+---
+# Replica Database (Azure)
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: stellara-postgres-replica-azure
+  namespace: stellara-backend
+spec:
+  serviceName: stellara-postgres-replica-azure
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: stellara-postgres-replica
+      cloud: azure
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: stellara-postgres-replica
+        cloud: azure
+    spec:
+      initContainers:
+      - name: init-replica
+        image: postgres:16-alpine
+        command:
+        - sh
+        - -c
+        - |
+          until pg_isready -h stellara-postgres -p 5432 -U stellara; do
+            echo 'Waiting for primary database...'
+            sleep 2
+          done
+          echo 'Primary database is ready'
+        env:
+        - name: PGUSER
+          valueFrom:
+            secretKeyRef:
+              name: stellara-backend-secrets
+              key: DATABASE_USER
+        - name: PGPASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: stellara-backend-secrets
+              key: DATABASE_PASSWORD
+      containers:
+      - name: postgres-replica
+        image: postgres:16-alpine
+        ports:
+        - containerPort: 5432
+        env:
+        - name: POSTGRES_USER
+          valueFrom:
+            secretKeyRef:
+              name: stellara-backend-secrets
+              key: DATABASE_USER
+        - name: POSTGRES_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: stellara-backend-secrets
+              key: DATABASE_PASSWORD
+        - name: POSTGRES_DB
+          value: stellara_db
+        command:
+        - postgres
+        - -c
+        - config_file=/etc/postgresql/postgresql.conf
+        volumeMounts:
+        - name: postgres-replica-data
+          mountPath: /var/lib/postgresql/data
+        - name: replica-config
+          mountPath: /etc/postgresql/postgresql.conf
+          subPath: postgresql.conf
+      volumes:
+      - name: replica-config
+        configMap:
+          name: postgres-replica-config
+  volumeClaimTemplates:
+  - metadata:
+      name: postgres-replica-data
+    spec:
+      accessModes: ["ReadWriteOnce"]
+      resources:
+        requests:
+          storage: 100Gi
+      storageClassName: managed-premium
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: postgres-replica-config
+  namespace: stellara-backend
+data:
+  postgresql.conf: |
+    # Replica database configuration
+    listen_addresses = '*'
+    hot_standby = on
+    primary_conninfo = 'host=stellara-postgres port=5432 user=stellara password=$(POSTGRES_PASSWORD) application_name=stellara_replica_azure'
+    recovery_target_timeline = 'latest'
+
+---
+# GCP Replica
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: stellara-postgres-replica-gcp
+  namespace: stellara-backend
+spec:
+  serviceName: stellara-postgres-replica-gcp
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: stellara-postgres-replica
+      cloud: gcp
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: stellara-postgres-replica
+        cloud: gcp
+    spec:
+      initContainers:
+      - name: init-replica
+        image: postgres:16-alpine
+        command:
+        - sh
+        - -c
+        - |
+          until pg_isready -h stellara-postgres -p 5432 -U stellara; do
+            echo 'Waiting for primary database...'
+            sleep 2
+          done
+          echo 'Primary database is ready'
+        env:
+        - name: PGUSER
+          valueFrom:
+            secretKeyRef:
+              name: stellara-backend-secrets
+              key: DATABASE_USER
+        - name: PGPASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: stellara-backend-secrets
+              key: DATABASE_PASSWORD
+      containers:
+      - name: postgres-replica
+        image: postgres:16-alpine
+        ports:
+        - containerPort: 5432
+        env:
+        - name: POSTGRES_USER
+          valueFrom:
+            secretKeyRef:
+              name: stellara-backend-secrets
+              key: DATABASE_USER
+        - name: POSTGRES_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: stellara-backend-secrets
+              key: DATABASE_PASSWORD
+        - name: POSTGRES_DB
+          value: stellara_db
+        command:
+        - postgres
+        - -c
+        - config_file=/etc/postgresql/postgresql.conf
+        volumeMounts:
+        - name: postgres-replica-data
+          mountPath: /var/lib/postgresql/data
+        - name: replica-config
+          mountPath: /etc/postgresql/postgresql.conf
+          subPath: postgresql.conf
+      volumes:
+      - name: replica-config
+        configMap:
+          name: postgres-replica-config
+  volumeClaimTemplates:
+  - metadata:
+      name: postgres-replica-data
+    spec:
+      accessModes: ["ReadWriteOnce"]
+      resources:
+        requests:
+          storage: 100Gi
+      storageClassName: premium-rwo

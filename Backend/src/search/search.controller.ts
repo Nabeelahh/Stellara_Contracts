@@ -1,9 +1,9 @@
-import { 
-  Controller, 
-  Get, 
-  Post, 
-  Query, 
-  Body, 
+import {
+  Controller,
+  Get,
+  Post,
+  Query,
+  Body,
   UseGuards,
   Request,
   HttpCode,
@@ -12,11 +12,7 @@ import {
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { SearchService } from './search.service';
-import { 
-  SearchQueryDto, 
-  SearchResponseDto,
-  SearchEntityType 
-} from './dto/search.dto';
+import { SearchQueryDto, SearchResponseDto, SearchEntityType } from './dto/search.dto';
 
 @ApiTags('Search')
 @Controller('search')

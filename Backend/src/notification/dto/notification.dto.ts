@@ -1,5 +1,6 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsBoolean, IsOptional } from 'class-validator';
+import { IsBoolean, IsInt, IsOptional, IsObject, IsString } from 'class-validator';
+import { NotificationChannel, NotificationType } from '@prisma/client';
 
 export class NotificationSettingsDto {
   @ApiProperty({
@@ -56,6 +57,19 @@ export class NotificationSettingsDto {
     default: true,
   })
   notifyDeadlines?: boolean;
+
+  @ApiPropertyOptional({
+    description: 'Per-notification-type channel preferences',
+    example: { CONTRIBUTION: ['EMAIL', 'PUSH'], DEADLINE: ['SMS'] },
+  })
+  channelPreferences?: Record<string, string[]>;
+
+  @ApiPropertyOptional({
+    description: 'Daily notification cap before frequency capping applies',
+    example: 5,
+    default: 5,
+  })
+  dailyLimit?: number;
 }
 
 export class UpdateNotificationSettingsDto {
@@ -114,6 +128,22 @@ export class UpdateNotificationSettingsDto {
   @IsBoolean()
   @IsOptional()
   notifyDeadlines?: boolean;
+
+  @ApiPropertyOptional({
+    description: 'Per-notification-type channel preferences',
+    example: { CONTRIBUTION: ['EMAIL', 'PUSH'], DEADLINE: ['SMS'] },
+  })
+  @IsObject()
+  @IsOptional()
+  channelPreferences?: Record<string, string[]>;
+
+  @ApiPropertyOptional({
+    description: 'Daily notification cap before frequency capping applies',
+    example: 5,
+  })
+  @IsInt()
+  @IsOptional()
+  dailyLimit?: number;
 }
 
 export class PushSubscriptionDto {
@@ -136,4 +166,32 @@ export class SubscribeResponseDto {
     example: true,
   })
   success: boolean;
+}
+
+export class UnsubscribeDto {
+  @ApiPropertyOptional({
+    description: 'Channel to unsubscribe from',
+    enum: ['EMAIL', 'SMS', 'PUSH', 'WEBSOCKET'],
+  })
+  @IsOptional()
+  @IsString()
+  channel?: NotificationChannel;
+
+  @ApiPropertyOptional({
+    description: 'Notification type to modify channel preference for',
+    enum: ['CONTRIBUTION', 'MILESTONE', 'DEADLINE', 'SYSTEM'],
+  })
+  @IsOptional()
+  @IsString()
+  type?: NotificationType;
+}
+
+export class TrackEventDto {
+  @ApiPropertyOptional({
+    description: 'Optional tracking source',
+    example: 'email',
+  })
+  @IsOptional()
+  @IsString()
+  source?: string;
 }

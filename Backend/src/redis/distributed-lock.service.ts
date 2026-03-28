@@ -1,8 +1,4 @@
-import {
-  ConflictException,
-  Injectable,
-  RequestTimeoutException,
-} from '@nestjs/common';
+import { ConflictException, Injectable, RequestTimeoutException } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
 import { AsyncContextService } from '../logging/services/async-context.service';
 import { StructuredLoggerService } from '../logging/services/structured-logger.service';
@@ -88,10 +84,8 @@ export class DistributedLockService {
           const lock = await this.acquireSingleLock(key, options.operationName, {
             timeoutMs: options.timeoutMs ?? this.defaultTimeoutMs,
             ttlMs: options.ttlMs ?? this.defaultTtlMs,
-            retryIntervalMs:
-              options.retryIntervalMs ?? this.defaultRetryIntervalMs,
-            deadlockWarningMs:
-              options.deadlockWarningMs ?? this.defaultDeadlockWarningMs,
+            retryIntervalMs: options.retryIntervalMs ?? this.defaultRetryIntervalMs,
+            deadlockWarningMs: options.deadlockWarningMs ?? this.defaultDeadlockWarningMs,
           });
           acquiredLocks.push(lock);
         }
@@ -207,10 +201,7 @@ export class DistributedLockService {
     );
   }
 
-  private async releaseSingleLock(
-    lock: HeldLockRecord,
-    operationName: string,
-  ): Promise<void> {
+  private async releaseSingleLock(lock: HeldLockRecord, operationName: string): Promise<void> {
     if (lock.holdCount > 1) {
       lock.holdCount -= 1;
       return;
@@ -222,12 +213,7 @@ export class DistributedLockService {
     }
 
     const redis = this.redisService.getClient();
-    const released = await redis.eval(
-      LOCK_RELEASE_SCRIPT,
-      1,
-      lock.redisKey,
-      lock.token,
-    );
+    const released = await redis.eval(LOCK_RELEASE_SCRIPT, 1, lock.redisKey, lock.token);
 
     this.getExecutionContext().heldLocks.delete(lock.key);
 
@@ -257,9 +243,7 @@ export class DistributedLockService {
         continue;
       }
 
-      const violatingKey = heldKeys.find(
-        (heldKey) => heldKey.localeCompare(requestedKey) > 0,
-      );
+      const violatingKey = heldKeys.find((heldKey) => heldKey.localeCompare(requestedKey) > 0);
 
       if (violatingKey) {
         void this.recordMetric(requestedKey, 'deadlockPreventions');
@@ -281,13 +265,9 @@ export class DistributedLockService {
   }
 
   private async refreshLock(lock: HeldLockRecord): Promise<void> {
-    const refreshed = await this.redisService.getClient().eval(
-      LOCK_REFRESH_SCRIPT,
-      1,
-      lock.redisKey,
-      lock.token,
-      `${lock.ttlMs}`,
-    );
+    const refreshed = await this.redisService
+      .getClient()
+      .eval(LOCK_REFRESH_SCRIPT, 1, lock.redisKey, lock.token, `${lock.ttlMs}`);
 
     if (Number(refreshed) !== 1) {
       this.logger.warn({
@@ -336,11 +316,7 @@ export class DistributedLockService {
     return `distributed-lock:metrics:${key}`;
   }
 
-  private async recordMetric(
-    lockKey: string,
-    field: string,
-    value = 1,
-  ): Promise<void> {
+  private async recordMetric(lockKey: string, field: string, value = 1): Promise<void> {
     const redis = this.redisService.getClient();
     await Promise.all([
       redis.hincrbyfloat(this.metricsKey, field, value),

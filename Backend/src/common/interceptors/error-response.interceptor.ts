@@ -14,7 +14,7 @@ import { BaseHttpException, ErrorResponse } from '../exceptions/http.exception';
 export class ErrorResponseInterceptor implements NestInterceptor {
   intercept(context: ExecutionContext, next: CallHandler): Observable<any> {
     const request = context.switchToHttp().getRequest();
-    
+
     return next.handle().pipe(
       map((data) => {
         // Wrap successful responses
@@ -30,13 +30,13 @@ export class ErrorResponseInterceptor implements NestInterceptor {
         if (error instanceof BaseHttpException) {
           throw error; // Will be caught by global filter
         }
-        
+
         // Convert other errors to BaseHttpException
         const httpException = new HttpException(
           error.message,
           error.status || HttpStatus.INTERNAL_SERVER_ERROR,
         );
-        
+
         throw httpException;
       }),
     );

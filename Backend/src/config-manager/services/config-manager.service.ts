@@ -85,7 +85,13 @@ export class ConfigManagerService {
     });
   }
 
-  async delete(key: string, scope: ConfigScope, tenantId?: string, userId?: string, actorId?: string): Promise<void> {
+  async delete(
+    key: string,
+    scope: ConfigScope,
+    tenantId?: string,
+    userId?: string,
+    actorId?: string,
+  ): Promise<void> {
     const entry = await this.findEntry(key, scope, tenantId, userId);
     if (!entry) return;
 
@@ -105,7 +111,9 @@ export class ConfigManagerService {
     });
   }
 
-  async listForTenant(tenantId: string): Promise<Array<{ key: string; value: string; scope: ConfigScope; encrypted: boolean }>> {
+  async listForTenant(
+    tenantId: string,
+  ): Promise<Array<{ key: string; value: string; scope: ConfigScope; encrypted: boolean }>> {
     const entries = await (this.prisma as any).configEntry.findMany({
       where: {
         OR: [
@@ -143,7 +151,12 @@ export class ConfigManagerService {
     return secret ?? entry.value;
   }
 
-  private buildSecretId(key: string, scope: ConfigScope, tenantId?: string, userId?: string): string {
+  private buildSecretId(
+    key: string,
+    scope: ConfigScope,
+    tenantId?: string,
+    userId?: string,
+  ): string {
     const parts = ['app-config', scope.toLowerCase(), key];
     if (tenantId) parts.push(tenantId);
     if (userId) parts.push(userId);

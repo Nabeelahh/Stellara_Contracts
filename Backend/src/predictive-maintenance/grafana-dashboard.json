@@ -1,0 +1,242 @@
+{
+  "dashboard": {
+    "id": null,
+    "title": "Predictive Maintenance Dashboard",
+    "tags": ["stellara", "predictive-maintenance", "infrastructure"],
+    "timezone": "browser",
+    "panels": [
+      {
+        "id": 1,
+        "title": "System Health Overview",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "stellara_predictive_health_status",
+            "legendFormat": "Health Status"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "mappings": [
+              {
+                "options": {
+                  "0": {
+                    "text": "CRITICAL",
+                    "color": "red"
+                  },
+                  "1": {
+                    "text": "WARNING",
+                    "color": "orange"
+                  },
+                  "2": {
+                    "text": "HEALTHY",
+                    "color": "green"
+                  }
+                },
+                "type": "value"
+              }
+            ]
+          }
+        }
+      },
+      {
+        "id": 2,
+        "title": "CPU Usage & Predictions",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "stellara_system_cpu_usage",
+            "legendFormat": "CPU Usage %"
+          },
+          {
+            "expr": "stellara_predictive_cpu_forecast",
+            "legendFormat": "CPU Forecast"
+          }
+        ]
+      },
+      {
+        "id": 3,
+        "title": "Memory Usage & Predictions",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "stellara_system_memory_usage",
+            "legendFormat": "Memory Usage %"
+          },
+          {
+            "expr": "stellara_predictive_memory_forecast",
+            "legendFormat": "Memory Forecast"
+          }
+        ]
+      },
+      {
+        "id": 4,
+        "title": "Disk Usage & Predictions",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "stellara_system_disk_usage",
+            "legendFormat": "Disk Usage %"
+          },
+          {
+            "expr": "stellara_predictive_disk_forecast",
+            "legendFormat": "Disk Forecast"
+          }
+        ]
+      },
+      {
+        "id": 5,
+        "title": "Active Predictions by Risk Level",
+        "type": "barchart",
+        "targets": [
+          {
+            "expr": "stellara_predictive_risk_level{risk=\"low\"}",
+            "legendFormat": "Low Risk"
+          },
+          {
+            "expr": "stellara_predictive_risk_level{risk=\"medium\"}",
+            "legendFormat": "Medium Risk"
+          },
+          {
+            "expr": "stellara_predictive_risk_level{risk=\"high\"}",
+            "legendFormat": "High Risk"
+          },
+          {
+            "expr": "stellara_predictive_risk_level{risk=\"critical\"}",
+            "legendFormat": "Critical Risk"
+          }
+        ]
+      },
+      {
+        "id": 6,
+        "title": "Anomaly Detection",
+        "type": "table",
+        "targets": [
+          {
+            "expr": "stellara_predictive_anomalies",
+            "legendFormat": "Anomalies"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "custom": {
+              "displayMode": "color-text"
+            }
+          },
+          "overrides": [
+            {
+              "matcher": {
+                "id": "byName",
+                "options": "severity"
+              },
+              "properties": [
+                {
+                  "id": "mappings",
+                  "value": [
+                    {
+                      "options": {
+                        "critical": {
+                          "color": "red",
+                          "text": "CRITICAL"
+                        },
+                        "high": {
+                          "color": "orange",
+                          "text": "HIGH"
+                        },
+                        "medium": {
+                          "color": "yellow",
+                          "text": "MEDIUM"
+                        },
+                        "low": {
+                          "color": "green",
+                          "text": "LOW"
+                        }
+                      },
+                      "type": "value"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "id": 7,
+        "title": "Maintenance Tickets",
+        "type": "table",
+        "targets": [
+          {
+            "expr": "stellara_maintenance_tickets",
+            "legendFormat": "Tickets"
+          }
+        ]
+      },
+      {
+        "id": 8,
+        "title": "ML Model Performance",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "stellara_ml_model_accuracy",
+            "legendFormat": "Model Accuracy"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "percentunit",
+            "min": 0,
+            "max": 1
+          }
+        }
+      },
+      {
+        "id": 9,
+        "title": "Prediction Confidence Distribution",
+        "type": "histogram",
+        "targets": [
+          {
+            "expr": "stellara_predictive_confidence",
+            "legendFormat": "Confidence Scores"
+          }
+        ]
+      },
+      {
+        "id": 10,
+        "title": "Capacity Forecast Timeline",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "stellara_capacity_forecast_days_remaining",
+            "legendFormat": "Days Until Capacity Limit"
+          }
+        ]
+      }
+    ],
+    "time": {
+      "from": "now-1h",
+      "to": "now"
+    },
+    "timepicker": {},
+    "templating": {
+      "list": []
+    },
+    "annotations": {
+      "list": [
+        {
+          "builtIn": 1,
+          "datasource": "-- Grafana --",
+          "enable": true,
+          "hide": true,
+          "iconColor": "rgba(0, 211, 255, 1)",
+          "name": "Annotations & Alerts",
+          "type": "dashboard"
+        }
+      ]
+    },
+    "refresh": "5m",
+    "schemaVersion": 27,
+    "version": 0,
+    "links": []
+  }
+}

@@ -1,10 +1,12 @@
-import { DynamicModule, Global, Module, Provider } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
+import { DynamicModule, Global, Module, Provider } from '@nestjs/common';
+
 import { AsyncContextService } from './services/async-context.service';
-import { StructuredLoggerService } from './services/structured-logger.service';
-import { CorrelationIdMiddleware } from './middleware/correlation-id.middleware';
 import { ClsMiddleware } from './middleware/cls-middleware';
+import { CorrelationIdMiddleware } from './middleware/correlation-id.middleware';
 import { LoggingModuleOptions } from './interfaces/logging-module-options.interface';
+import { RequestLoggingInterceptor } from './interceptors/request-logging.interceptor';
+import { StructuredLoggerService } from './services/structured-logger.service';
 
 @Global()
 @Module({})
@@ -29,6 +31,7 @@ export class LoggingModule {
         inject: [ConfigService, AsyncContextService],
       },
       CorrelationIdMiddleware,
+      RequestLoggingInterceptor,
     ];
 
     return {
@@ -39,6 +42,7 @@ export class LoggingModule {
         AsyncContextService,
         StructuredLoggerService,
         CorrelationIdMiddleware,
+        RequestLoggingInterceptor,
         'LOGGER_SERVICE',
         ClsMiddleware,
       ],
@@ -70,6 +74,7 @@ export class LoggingModule {
         inject: [ConfigService, AsyncContextService],
       },
       CorrelationIdMiddleware,
+      RequestLoggingInterceptor,
     ];
 
     return {
@@ -80,6 +85,7 @@ export class LoggingModule {
         AsyncContextService,
         StructuredLoggerService,
         CorrelationIdMiddleware,
+        RequestLoggingInterceptor,
         'LOGGER_SERVICE',
         ClsMiddleware,
       ],

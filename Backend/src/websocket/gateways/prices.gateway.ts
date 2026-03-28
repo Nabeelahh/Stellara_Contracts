@@ -31,24 +31,21 @@ export class PricesGateway implements OnGatewayConnection, OnGatewayDisconnect {
       // Auth is handled per-message via guard, but we can do a lightweight check here
       const userId = client.handshake.query?.userId as string;
       if (userId) {
-        this.connectionState.register(userId, client.id, 'prices');
+        await this.connectionState.register(userId, client.id, 'prices');
       }
     } catch {
       client.disconnect();
     }
   }
 
-  handleDisconnect(client: Socket) {
-    this.connectionState.unregister(client.id);
+  async handleDisconnect(client: Socket) {
+    await this.connectionState.unregister(client.id);
   }
 
   /** Subscribe to price updates for a specific asset (e.g. "XLM-USDC") */
   @UseGuards(WsJwtGuard)
   @SubscribeMessage('subscribe:asset')
-  async subscribeAsset(
-    @ConnectedSocket() client: Socket,
-    @MessageBody() data: { asset: string },
-  ) {
+  async subscribeAsset(@ConnectedSocket() client: Socket, @MessageBody() data: { asset: string }) {
     if (!data?.asset) throw new WsException('asset is required');
 
     const room = `prices:${data.asset.toUpperCase()}`;

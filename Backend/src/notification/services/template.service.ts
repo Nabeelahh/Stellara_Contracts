@@ -11,9 +11,18 @@ export class TemplateService {
   }
 
   private registerDefaultTemplates() {
-    this.registerTemplate('CONTRIBUTION', 'New contribution of {{amount}} received for project {{projectTitle}}.');
-    this.registerTemplate('MILESTONE', 'Milestone {{milestoneTitle}} for project {{projectTitle}} has been {{status}}.');
-    this.registerTemplate('DEADLINE', 'Deadline for project {{projectTitle}} is approaching: {{deadline}}.');
+    this.registerTemplate(
+      'CONTRIBUTION',
+      'New contribution of {{amount}} received for project {{projectTitle}}.',
+    );
+    this.registerTemplate(
+      'MILESTONE',
+      'Milestone {{milestoneTitle}} for project {{projectTitle}} has been {{status}}.',
+    );
+    this.registerTemplate(
+      'DEADLINE',
+      'Deadline for project {{projectTitle}} is approaching: {{deadline}}.',
+    );
     this.registerTemplate('SYSTEM', 'System notification: {{message}}');
   }
 

@@ -9,24 +9,24 @@ export class UserController {
   constructor(private readonly prisma: PrismaService) {}
 
   @Get(':id')
-  @ApiOperation({ 
+  @ApiOperation({
     summary: 'Get user by ID',
-    description: 'Retrieves a user\'s public profile information by their unique identifier'
+    description: "Retrieves a user's public profile information by their unique identifier",
   })
   @ApiParam({
     name: 'id',
     description: 'User unique identifier',
     example: 'cm3x1234567890',
   })
-  @ApiResponse({ 
-    status: 200, 
+  @ApiResponse({
+    status: 200,
     description: 'User found',
-    type: UserResponseDto 
+    type: UserResponseDto,
   })
-  @ApiResponse({ 
-    status: 404, 
+  @ApiResponse({
+    status: 404,
     description: 'User not found',
-    type: UserNotFoundDto 
+    type: UserNotFoundDto,
   })
   async getUser(@Param('id') id: string): Promise<UserResponseDto | UserNotFoundDto> {
     const user = await this.prisma.user.findUnique({ where: { id } });
