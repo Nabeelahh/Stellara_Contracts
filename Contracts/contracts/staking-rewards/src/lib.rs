@@ -243,6 +243,24 @@ impl StakingRewardsContract {
             &principal_to_return,
         );
 
+        // Pay out any accrued rewards before clearing the stake
+        let reward_amount = calculate_rewards(&env, &user_stake).unwrap_or(0);
+        if reward_amount > 0 {
+            let reward_token: Address = env
+                .storage()
+                .instance()
+                .get(&storage_keys::REWARD_TOKEN)
+                .unwrap();
+
+            let reward_client = soroban_sdk::token::Client::new(&env, &reward_token);
+            reward_client.transfer(&env.current_contract_address(), &user, &reward_amount);
+
+            env.events().publish(
+                (symbol_short!("claim"), user.clone()),
+                (reward_amount, env.ledger().timestamp()),
+            );
+        }
+
         // Remove stake
         env.storage().persistent().remove(&key);
 

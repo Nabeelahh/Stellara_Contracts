@@ -11,6 +11,7 @@ members = [
     "contracts/tcr",
     "contracts/cross-chain-router",
     "contracts/amm",
+    "contracts/staking-rewards",
     "integration-tests",
     "shared",
     "contracts/upgradeability",
