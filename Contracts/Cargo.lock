@@ -611,6 +611,7 @@ dependencies = [
  "shared",
  "social_rewards",
  "soroban-sdk",
+ "stellara-synthetic-assets",
  "trading",
  "upgradeability",
 ]
