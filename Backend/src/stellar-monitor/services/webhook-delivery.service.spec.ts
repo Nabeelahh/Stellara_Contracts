@@ -123,13 +123,16 @@ describe('WebhookDeliveryService', () => {
       getConsumerById: jest.fn(),
       updateDeliveryStats: jest.fn().mockResolvedValue(undefined),
       recordDeliveryProgress: jest.fn().mockResolvedValue(undefined),
+      getDecryptedSecret: jest.fn().mockResolvedValue('topsecret'),
     };
     eventService = {
       updateEventStatus: jest.fn().mockResolvedValue(undefined),
       markEventAsProcessed: jest.fn().mockResolvedValue(undefined),
       getPendingEvents: jest.fn().mockResolvedValue([]),
     };
+    const queueMock = { add: jest.fn(), count: jest.fn().mockResolvedValue(0) };
     service = new WebhookDeliveryService(
+      queueMock as any,
       consumerService as ConsumerManagementService,
       eventService as EventStorageService,
     );
@@ -214,19 +217,13 @@ describe('WebhookDeliveryService', () => {
         'consumer-1',
         'boom',
       );
-      expect(service.getQueueSize()).toBe(0);
-
-      // Hold the queue so the re-queued item is observable (otherwise
-      // processQueue drains it immediately).
-      (service as any).isProcessingQueue = true;
-
-      // Nothing re-queued before the 1s backoff elapses...
-      jest.advanceTimersByTime(999);
-      expect(service.getQueueSize()).toBe(0);
-      // ...and re-queued with an incremented attempt afterwards.
-      jest.advanceTimersByTime(1);
-      expect(service.getQueueSize()).toBe(1);
-      expect((service as any).deliveryQueue[0].attempt).toBe(2);
+      // Bull handles retry scheduling — no dead-letter at attempt 1.
+      expect(eventService.updateEventStatus).not.toHaveBeenCalledWith(
+        expect.anything(),
+        DeliveryStatus.DEAD_LETTER,
+        expect.anything(),
+        expect.anything(),
+      );
     });
 
     it('moves to dead-letter after the 5th failed attempt', async () => {
@@ -241,9 +238,6 @@ describe('WebhookDeliveryService', () => {
         'consumer-1',
         'boom',
       );
-      // No retry scheduled.
-      jest.advanceTimersByTime(WebhookDeliveryService.RETRY_DELAYS_MS[4]);
-      expect(service.getQueueSize()).toBe(0);
     });
 
     it('dead-letters immediately when the URL is unsafe (SSRF)', async () => {

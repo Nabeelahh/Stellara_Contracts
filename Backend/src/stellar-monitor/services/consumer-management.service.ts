@@ -10,6 +10,7 @@ import { WebhookConsumer } from '../entities/webhook-consumer.entity';
 import { CreateConsumerDto } from '../dto/create-consumer.dto';
 import { UpdateConsumerDto } from '../dto/update-consumer.dto';
 import { ConsumerStatus } from '../types/stellar.types';
+import { WebhookSecretService } from './webhook-secret.service';
 
 @Injectable()
 export class ConsumerManagementService {
@@ -18,6 +19,7 @@ export class ConsumerManagementService {
   constructor(
     @InjectRepository(WebhookConsumer)
     private readonly consumerRepository: Repository<WebhookConsumer>,
+    private readonly webhookSecretService: WebhookSecretService,
   ) {}
 
   async createConsumer(createDto: CreateConsumerDto): Promise<WebhookConsumer> {
@@ -31,11 +33,16 @@ export class ConsumerManagementService {
         throw new BadRequestException('Consumer with this URL already exists');
       }
 
-      const consumer = this.consumerRepository.create({
+      const data: Partial<WebhookConsumer> = {
         ...createDto,
         status: ConsumerStatus.ACTIVE,
-      });
+      };
 
+      if (createDto.secret) {
+        data.secret = this.webhookSecretService.encrypt(createDto.secret);
+      }
+
+      const consumer = this.consumerRepository.create(data);
       const savedConsumer = await this.consumerRepository.save(consumer);
       this.logger.log(
         `Created webhook consumer ${savedConsumer.id} (${savedConsumer.name})`,
@@ -70,6 +77,16 @@ export class ConsumerManagementService {
     return consumer;
   }
 
+  /**
+   * Returns the decrypted plaintext secret for a consumer, or undefined if the
+   * consumer has no secret configured. Used internally for HMAC signing only.
+   */
+  async getDecryptedSecret(id: string): Promise<string | undefined> {
+    const consumer = await this.getConsumerById(id);
+    if (!consumer.secret) return undefined;
+    return this.webhookSecretService.decrypt(consumer.secret);
+  }
+
   async updateConsumer(
     id: string,
     updateDto: UpdateConsumerDto,
@@ -89,11 +106,27 @@ export class ConsumerManagementService {
       }
     }
 
-    Object.assign(consumer, updateDto);
+    const update: Partial<WebhookConsumer> = { ...updateDto };
+    if (updateDto.secret) {
+      update.secret = this.webhookSecretService.encrypt(updateDto.secret);
+    }
+
+    Object.assign(consumer, update);
     const updatedConsumer = await this.consumerRepository.save(consumer);
 
     this.logger.log(`Updated consumer ${id} (${updatedConsumer.name})`);
     return updatedConsumer;
+  }
+
+  /**
+   * Rotates the signing secret for a consumer. The new plaintext secret is
+   * encrypted and persisted atomically; the old value is overwritten.
+   */
+  async rotateSecret(id: string, newSecret: string): Promise<void> {
+    const consumer = await this.getConsumerById(id);
+    consumer.secret = this.webhookSecretService.encrypt(newSecret);
+    await this.consumerRepository.save(consumer);
+    this.logger.log(`Rotated secret for consumer ${id}`);
   }
 
   async deleteConsumer(id: string): Promise<void> {

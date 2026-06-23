@@ -190,14 +190,19 @@ export class WebhookDeliveryService {
 
     // Add HMAC-SHA256 signature if consumer has a secret so the consumer can
     // verify the payload originated from us and was not tampered with.
+    // The secret is stored encrypted; decrypt it here for signing only.
     if (consumer.secret) {
-      config.headers = {
-        ...config.headers,
-        [WebhookDeliveryService.SIGNATURE_HEADER]: this.generateSignature(
-          body,
-          consumer.secret,
-        ),
-      };
+      const plaintextSecret =
+        await this.consumerManagementService.getDecryptedSecret(consumer.id);
+      if (plaintextSecret) {
+        config.headers = {
+          ...config.headers,
+          [WebhookDeliveryService.SIGNATURE_HEADER]: this.generateSignature(
+            body,
+            plaintextSecret,
+          ),
+        };
+      }
     }
 
     try {

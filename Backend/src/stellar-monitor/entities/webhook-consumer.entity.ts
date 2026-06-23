@@ -6,6 +6,7 @@ import {
   UpdateDateColumn,
   Index,
 } from 'typeorm';
+import { Exclude } from 'class-transformer';
 import { ConsumerStatus } from '../types/stellar.types';
 
 @Entity('webhook_consumers')
@@ -20,7 +21,12 @@ export class WebhookConsumer {
   @Index()
   url: string;
 
-  @Column({ length: 100, nullable: true })
+  /**
+   * AES-256-GCM encrypted secret stored as `<iv>:<tag>:<ciphertext>` (all hex).
+   * Excluded from serialized API responses — never returned to callers.
+   */
+  @Column({ length: 512, nullable: true })
+  @Exclude()
   secret: string;
 
   @Column({

@@ -9,6 +9,8 @@ import {
   Query,
   HttpStatus,
   HttpException,
+  UseInterceptors,
+  ClassSerializerInterceptor,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -26,9 +28,17 @@ import { UpdateConsumerDto } from '../dto/update-consumer.dto';
 import { WebhookConsumer } from '../entities/webhook-consumer.entity';
 import { StellarEvent } from '../entities/stellar-event.entity';
 import { EventType, DeliveryStatus } from '../types/stellar.types';
+import { IsString, Length } from 'class-validator';
+
+class RotateSecretDto {
+  @IsString()
+  @Length(1, 100)
+  secret: string;
+}
 
 @ApiTags('Stellar Monitor')
 @Controller('api/stellar')
+@UseInterceptors(ClassSerializerInterceptor)
 export class StellarMonitorController {
   constructor(
     private readonly consumerService: ConsumerManagementService,
@@ -150,6 +160,22 @@ export class StellarMonitorController {
         statusCode: result.statusCode,
         errorMessage: result.errorMessage,
       };
+    } catch (error) {
+      throw new HttpException(error.message, HttpStatus.NOT_FOUND);
+    }
+  }
+
+  @Post('consumers/:id/rotate-secret')
+  @ApiOperation({ summary: 'Rotate the signing secret for a webhook consumer' })
+  @ApiParam({ name: 'id', description: 'Consumer ID' })
+  @ApiResponse({ status: 204, description: 'Secret rotated successfully' })
+  @ApiResponse({ status: 404, description: 'Consumer not found' })
+  async rotateSecret(
+    @Param('id') id: string,
+    @Body() body: RotateSecretDto,
+  ): Promise<void> {
+    try {
+      await this.consumerService.rotateSecret(id, body.secret);
     } catch (error) {
       throw new HttpException(error.message, HttpStatus.NOT_FOUND);
     }
