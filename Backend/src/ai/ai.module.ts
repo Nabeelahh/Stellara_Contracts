@@ -7,9 +7,10 @@ import { FallbackProvider } from './providers/fallback.provider';
 import { AiCacheService } from './cache/ai-cache.service';
 import { QuotaService } from './quota/quota.service';
 import { AI_PROVIDER, AI_FALLBACK_PROVIDER } from './ai.provider';
+import { RedisModule } from '../redis/redis.module';
 
 @Module({
-  imports: [ConfigModule],
+  imports: [ConfigModule, RedisModule],
   controllers: [AiController],
   providers: [
     AiService,

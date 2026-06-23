@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import axios from 'axios';
 import { AiProvider } from '../ai.provider';
@@ -10,7 +10,7 @@ interface CircuitBreakerState {
 }
 
 @Injectable()
-export class OpenAiProvider implements AiProvider {
+export class OpenAiProvider implements AiProvider, OnModuleInit {
   private readonly logger = new Logger(OpenAiProvider.name);
   private readonly apiKey: string;
   private readonly timeoutMs: number;
@@ -27,7 +27,17 @@ export class OpenAiProvider implements AiProvider {
     this.timeoutMs = this.config.get<number>('AI_TIMEOUT_MS') ?? 30_000;
   }
 
-  async generate(prompt: string): Promise<{ response: string; tokensUsed: number }> {
+  onModuleInit(): void {
+    if (!this.apiKey) {
+      throw new Error(
+        'OPENAI_API_KEY is not set. AI features require a valid API key at startup.',
+      );
+    }
+  }
+
+  async generate(
+    prompt: string,
+  ): Promise<{ response: string; tokensUsed: number }> {
     this.checkCircuit();
 
     try {

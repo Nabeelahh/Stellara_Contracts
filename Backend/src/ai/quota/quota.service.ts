@@ -1,25 +1,29 @@
 import { Injectable, ForbiddenException } from '@nestjs/common';
-
-interface QuotaRecord {
-  requestCount: number;
-  tokenCount: number;
-}
+import { RedisService } from '../../redis/redis.service';
 
 @Injectable()
 export class QuotaService {
   private readonly MAX_REQUESTS = 1000;
-  private quotas = new Map<string, QuotaRecord>();
+  // TTL slightly over 31 days so a key always covers its full month
+  private readonly TTL_SECONDS = 31 * 24 * 60 * 60;
 
-  private getKey(userId: string): string {
+  constructor(private readonly redis: RedisService) {}
+
+  private requestKey(userId: string): string {
     const month = new Date().toISOString().slice(0, 7); // YYYY-MM
-    return `${userId}:${month}`;
+    return `ai:quota:req:${userId}:${month}`;
+  }
+
+  private tokenKey(userId: string): string {
+    const month = new Date().toISOString().slice(0, 7);
+    return `ai:quota:tok:${userId}:${month}`;
   }
 
   async assertQuota(userId: string): Promise<void> {
-    const key = this.getKey(userId);
-    const quota = this.quotas.get(key);
+    const key = this.requestKey(userId);
+    const count = await this.redis.client.get(key);
 
-    if (quota && quota.requestCount >= this.MAX_REQUESTS) {
+    if (count !== null && parseInt(count, 10) >= this.MAX_REQUESTS) {
       throw new ForbiddenException({
         error: 'QuotaExceeded',
         message: 'Monthly AI usage quota exceeded',
@@ -28,12 +32,18 @@ export class QuotaService {
   }
 
   async recordUsage(userId: string, tokens: number): Promise<void> {
-    const key = this.getKey(userId);
-    const existing = this.quotas.get(key) || { requestCount: 0, tokenCount: 0 };
+    const rKey = this.requestKey(userId);
+    const tKey = this.tokenKey(userId);
 
-    this.quotas.set(key, {
-      requestCount: existing.requestCount + 1,
-      tokenCount: existing.tokenCount + tokens,
-    });
+    // Atomic increment; set TTL only on first write
+    const reqCount = await this.redis.client.incr(rKey);
+    if (reqCount === 1) {
+      await this.redis.client.expire(rKey, this.TTL_SECONDS);
+    }
+
+    const tokCount = await this.redis.client.incrBy(tKey, tokens);
+    if (tokCount === tokens) {
+      await this.redis.client.expire(tKey, this.TTL_SECONDS);
+    }
   }
 }
