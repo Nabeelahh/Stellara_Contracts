@@ -1,14 +1,11 @@
 #![no_std]
 
-use soroban_sdk::{
-    contract, contracterror, contractimpl, contracttype, Address, Env, Symbol,
+use shared::events::{
+    extended_topics, AssetRegisteredEvent, CdpClosedEvent, CdpLiquidatedEvent, CdpOpenedEvent,
+    CollateralAddedEvent, PriceUpdatedEvent,
 };
 use soroban_sdk::token::{Client as TokenClient, StellarAssetClient};
-use shared::events::{
-    extended_topics,
-    AssetRegisteredEvent, CdpOpenedEvent, CdpClosedEvent,
-    CollateralAddedEvent, CdpLiquidatedEvent, PriceUpdatedEvent,
-};
+use soroban_sdk::{contract, contracterror, contractimpl, contracttype, Address, Env, Symbol};
 
 #[contracterror]
 #[derive(Copy, Clone, Debug, Eq, PartialEq, PartialOrd, Ord)]
@@ -23,6 +20,8 @@ pub enum Error {
     CDPNotFound = 7,
     NotLiquidatable = 8,
     AssetNotFound = 9,
+    InvalidPrice = 10,
+    PriceStale = 11,
 }
 
 #[contracttype]
@@ -38,15 +37,17 @@ pub struct CDP {
 #[contracttype]
 #[derive(Clone)]
 pub struct SyntheticConfig {
-    pub oracle_price: i128,       // price scaled by 1_000_000
-    pub min_cratio: i128,         // scaled by 10000 (15000 = 150%)
-    pub liq_cratio: i128,         // scaled by 10000 (12000 = 120%)
-    pub liq_penalty: i128,        // scaled by 10000 (1300 = 13%)
-    pub stability_fee_bps: i32,   // annual fee in bps (200 = 2%)
+    pub oracle_price: i128,     // price scaled by 1_000_000
+    pub min_cratio: i128,       // scaled by 10000 (15000 = 150%)
+    pub liq_cratio: i128,       // scaled by 10000 (12000 = 120%)
+    pub liq_penalty: i128,      // scaled by 10000 (1300 = 13%)
+    pub stability_fee_bps: i32, // annual fee in bps (200 = 2%)
     pub total_minted: i128,
     pub is_active: bool,
-    pub collateral_token: Address, // token accepted as collateral
-    pub synthetic_token: Address,  // SAC minted/burned for synthetic debt
+    pub collateral_token: Address,  // token accepted as collateral
+    pub synthetic_token: Address,   // SAC minted/burned for synthetic debt
+    pub last_updated: u64,          // ledger timestamp of last valid oracle update
+    pub price_max_age_seconds: u64, // max age before the price is considered stale
 }
 
 mod keys {
@@ -78,6 +79,7 @@ impl SyntheticAssetsContract {
         stability_fee_bps: i32,
         collateral_token: Address,
         synthetic_token: Address,
+        price_max_age_seconds: u64,
     ) -> Result<(), Error> {
         caller.require_auth();
         Self::require_admin(&env, &caller)?;
@@ -92,6 +94,8 @@ impl SyntheticAssetsContract {
             is_active: true,
             collateral_token,
             synthetic_token,
+            last_updated: 0,
+            price_max_age_seconds,
         };
         env.storage().persistent().set(&asset_symbol, &config);
 
@@ -117,6 +121,12 @@ impl SyntheticAssetsContract {
         caller.require_auth();
         Self::require_admin(&env, &caller)?;
 
+        // Reject non-positive prices to prevent division-by-zero in CDP math
+        // and to keep the oracle from silently feeding bogus data downstream.
+        if new_price <= 0 {
+            return Err(Error::InvalidPrice);
+        }
+
         let mut config: SyntheticConfig = env
             .storage()
             .persistent()
@@ -125,6 +135,7 @@ impl SyntheticAssetsContract {
 
         let old_price = config.oracle_price;
         config.oracle_price = new_price;
+        config.last_updated = env.ledger().timestamp();
         env.storage().persistent().set(&asset_symbol, &config);
 
         env.events().publish(
@@ -160,8 +171,11 @@ impl SyntheticAssetsContract {
             .ok_or(Error::AssetNotFound)?;
 
         // Pull collateral from owner into the contract
-        TokenClient::new(&env, &config.collateral_token)
-            .transfer(&owner, &env.current_contract_address(), &collateral_amount);
+        TokenClient::new(&env, &config.collateral_token).transfer(
+            &owner,
+            &env.current_contract_address(),
+            &collateral_amount,
+        );
 
         let cdp_key = Self::cdp_key(&owner, &asset_symbol);
         let cdp = CDP {
@@ -204,6 +218,8 @@ impl SyntheticAssetsContract {
             .get(&asset_symbol)
             .ok_or(Error::AssetNotFound)?;
 
+        Self::require_valid_price(&env, &config)?;
+
         let cdp_key = Self::cdp_key(&owner, &asset_symbol);
         let mut cdp: CDP = env
             .storage()
@@ -226,7 +242,9 @@ impl SyntheticAssetsContract {
         updated_config.total_minted += mint_amount;
 
         env.storage().persistent().set(&cdp_key, &cdp);
-        env.storage().persistent().set(&asset_symbol, &updated_config);
+        env.storage()
+            .persistent()
+            .set(&asset_symbol, &updated_config);
 
         // Mint synthetic tokens to the owner
         StellarAssetClient::new(&env, &config.synthetic_token).mint(&owner, &mint_amount);
@@ -252,6 +270,8 @@ impl SyntheticAssetsContract {
             .persistent()
             .get(&asset_symbol)
             .ok_or(Error::AssetNotFound)?;
+
+        Self::require_valid_price(&env, &config)?;
 
         let cdp_key = Self::cdp_key(&owner, &asset_symbol);
         let mut cdp: CDP = env
@@ -280,7 +300,9 @@ impl SyntheticAssetsContract {
         updated_config.total_minted -= burn_amount;
 
         env.storage().persistent().set(&cdp_key, &cdp);
-        env.storage().persistent().set(&asset_symbol, &updated_config);
+        env.storage()
+            .persistent()
+            .set(&asset_symbol, &updated_config);
         Ok(())
     }
 
@@ -303,6 +325,8 @@ impl SyntheticAssetsContract {
             .get(&asset_symbol)
             .ok_or(Error::AssetNotFound)?;
 
+        Self::require_valid_price(&env, &config)?;
+
         let cdp_key = Self::cdp_key(&owner, &asset_symbol);
         let mut cdp: CDP = env
             .storage()
@@ -311,8 +335,11 @@ impl SyntheticAssetsContract {
             .ok_or(Error::CDPNotFound)?;
 
         // Pull additional collateral from owner into the contract
-        TokenClient::new(&env, &config.collateral_token)
-            .transfer(&owner, &env.current_contract_address(), &amount);
+        TokenClient::new(&env, &config.collateral_token).transfer(
+            &owner,
+            &env.current_contract_address(),
+            &amount,
+        );
 
         cdp.collateral_amount += amount;
 
@@ -351,6 +378,8 @@ impl SyntheticAssetsContract {
             .get(&asset_symbol)
             .ok_or(Error::AssetNotFound)?;
 
+        Self::require_valid_price(&env, &config)?;
+
         let cdp_key = Self::cdp_key(&cdp_owner, &asset_symbol);
         let mut cdp: CDP = env
             .storage()
@@ -377,14 +406,19 @@ impl SyntheticAssetsContract {
         cdp.collateral_amount = 0;
 
         env.storage().persistent().set(&cdp_key, &cdp);
-        env.storage().persistent().set(&asset_symbol, &updated_config);
+        env.storage()
+            .persistent()
+            .set(&asset_symbol, &updated_config);
 
         // Liquidator burns the debt tokens to repay the position
         TokenClient::new(&env, &config.synthetic_token).burn(&liquidator, &debt);
 
         // Transfer seized collateral to the liquidator
-        TokenClient::new(&env, &config.collateral_token)
-            .transfer(&env.current_contract_address(), &liquidator, &seized);
+        TokenClient::new(&env, &config.collateral_token).transfer(
+            &env.current_contract_address(),
+            &liquidator,
+            &seized,
+        );
 
         env.events().publish(
             (extended_topics::CDP_LIQUIDATED,),
@@ -429,8 +463,11 @@ impl SyntheticAssetsContract {
         env.storage().persistent().set(&cdp_key, &cdp);
 
         // Return collateral to owner
-        TokenClient::new(&env, &config.collateral_token)
-            .transfer(&env.current_contract_address(), &owner, &returned);
+        TokenClient::new(&env, &config.collateral_token).transfer(
+            &env.current_contract_address(),
+            &owner,
+            &returned,
+        );
 
         env.events().publish(
             (extended_topics::CDP_CLOSED,),
@@ -462,6 +499,31 @@ impl SyntheticAssetsContract {
     }
 
     // ── Helpers ────────────────────────────────────────────────────────────────
+
+    /// Ensure the stored oracle price is strictly positive, has been initialized,
+    /// and has not aged beyond the per-asset `price_max_age_seconds` window.
+    ///
+    /// Called by every CDP operation that depends on the oracle price so that
+    /// division-by-zero and stale-price scenarios cannot trap users.
+    fn require_valid_price(env: &Env, config: &SyntheticConfig) -> Result<(), Error> {
+        // `oracle_price <= 0` covers both "never initialized" (register_asset
+        // seeds 0) and any explicit zero/negative update (rejected by
+        // update_price itself). We intentionally do NOT gate on
+        // `last_updated == 0` here: at Soroban's default test-clock value of
+        // 0 a fresh `update_price` legitimately stamps last_updated to 0, and
+        // conflating that with "uninitialized" would brick every test that
+        // touches mint/burn/add_collateral/liquidate without bumping the
+        // ledger. Staleness is enforced separately below.
+        if config.oracle_price <= 0 {
+            return Err(Error::InvalidPrice);
+        }
+        let now = env.ledger().timestamp();
+        // saturating_sub guards against any future-dated `last_updated` values.
+        if now.saturating_sub(config.last_updated) > config.price_max_age_seconds {
+            return Err(Error::PriceStale);
+        }
+        Ok(())
+    }
 
     fn require_admin(env: &Env, caller: &Address) -> Result<(), Error> {
         let admin: Address = env
