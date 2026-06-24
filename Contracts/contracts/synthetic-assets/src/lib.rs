@@ -22,6 +22,10 @@ pub enum Error {
     AssetNotFound = 9,
     InvalidPrice = 10,
     PriceStale = 11,
+    // PR #802 sanity checks on registration parameters. Appended at the end
+    // so existing ABI codes for InvalidPrice (10) and PriceStale (11) are
+    // preserved across the merge.
+    InvalidConfig = 12,
 }
 
 #[contracttype]
