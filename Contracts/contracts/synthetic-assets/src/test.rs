@@ -170,7 +170,7 @@ fn test_liquidation_transfers_collateral_to_liquidator() {
         &admin,
         &asset,
         &15000, // min_cratio: 150%
-        &16000, // liq_cratio: 160% (intentionally > min for test setup)
+        &12000, // liq_cratio: 120%
         &1300,  // liq_penalty: 13%
         &50,
         &coll_addr,
