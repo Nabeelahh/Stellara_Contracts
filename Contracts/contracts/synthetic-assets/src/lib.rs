@@ -22,6 +22,10 @@ pub enum Error {
     AssetNotFound = 9,
     InvalidPrice = 10,
     PriceStale = 11,
+    // PR #802 sanity checks on registration parameters. Appended at the end
+    // so existing ABI codes for InvalidPrice (10) and PriceStale (11) are
+    // preserved across the merge.
+    InvalidConfig = 12,
 }
 
 #[contracttype]
@@ -83,6 +87,30 @@ impl SyntheticAssetsContract {
     ) -> Result<(), Error> {
         caller.require_auth();
         Self::require_admin(&env, &caller)?;
+
+        // Sanity-check configuration to prevent unsafe parameters at registration
+        // time. We require:
+        //   * min_cratio > liq_cratio  (so a freshly minted position cannot be
+        //     immediately liquidatable — liq_cratio > min_cratio would let a user
+        //     mint at exactly min_cratio and have an under-collateralized CDP),
+        //   * liq_cratio > 0           (otherwise the position can never be
+        //     liquidatable),
+        //   * liq_penalty in [0, 10000] (0%..=100%; values above 100% would let
+        //     the liquidator seize more collateral than the CDP holds),
+        //   * stability_fee_bps >= 0   (bps is u32 semantics; negative bps is
+        //     nonsensical).
+        if min_cratio <= liq_cratio {
+            return Err(Error::InvalidConfig);
+        }
+        if liq_cratio <= 0 {
+            return Err(Error::InvalidConfig);
+        }
+        if liq_penalty < 0 || liq_penalty > 10000 {
+            return Err(Error::InvalidConfig);
+        }
+        if stability_fee_bps < 0 || stability_fee_bps > 10000 {
+            return Err(Error::InvalidConfig);
+        }
 
         let config = SyntheticConfig {
             oracle_price: 0,
@@ -170,22 +198,26 @@ impl SyntheticAssetsContract {
             .get(&asset_symbol)
             .ok_or(Error::AssetNotFound)?;
 
-        // Pull collateral from owner into the contract
-        TokenClient::new(&env, &config.collateral_token).transfer(
-            &owner,
-            &env.current_contract_address(),
-            &collateral_amount,
-        );
-
         let cdp_key = Self::cdp_key(&owner, &asset_symbol);
         let cdp = CDP {
             owner: owner.clone(),
             collateral_amount,
             minted_amount: 0,
-            collateral_ratio: 0,
+            // A zero-debt position is effectively infinitely healthy; represent
+            // it with i128::MAX so downstream ratio comparisons never report a
+            // misleading 0% collateralization for a freshly opened but un-minted
+            // CDP.
+            collateral_ratio: i128::MAX,
             is_active: true,
         };
         env.storage().persistent().set(&cdp_key, &cdp);
+
+        // Pull collateral from owner into the contract. Storage written
+        // first so any reentrant observation of this contract's state
+        // already reflects the ownership change before the token
+        // movement settles (PR #802 hardening).
+        TokenClient::new(&env, &config.collateral_token)
+            .transfer(&owner, &env.current_contract_address(), &collateral_amount);
 
         env.events().publish(
             (extended_topics::CDP_OPENED,),
@@ -284,25 +316,40 @@ impl SyntheticAssetsContract {
             return Err(Error::InvalidAmount);
         }
 
-        // Burn synthetic tokens from the owner before updating state
-        TokenClient::new(&env, &config.synthetic_token).burn(&owner, &burn_amount);
-
+        // Update CDP and aggregate state before performing the external token
+        // burn so the on-chain accounting matches the token movement. (Soroban
+        // rolls back atomically on panic, so a failed burn will still revert
+        // the storage write.)
         cdp.minted_amount -= burn_amount;
 
         if cdp.minted_amount > 0 {
-            let collateral_usd = cdp.collateral_amount * 1_000_000 / config.oracle_price;
-            cdp.collateral_ratio = collateral_usd * 10000 / cdp.minted_amount;
+            if config.oracle_price <= 0 {
+                // The asset was originally minted, so a subsequent price reset
+                // to zero should not crash the contract on burn — treat as
+                // unhealthy (ratio 0) and let governance / oracle recovery
+                // processes decide what to do next.
+                cdp.collateral_ratio = 0;
+            } else {
+                let collateral_usd =
+                    cdp.collateral_amount * 1_000_000 / config.oracle_price;
+                cdp.collateral_ratio = collateral_usd * 10000 / cdp.minted_amount;
+            }
         } else {
             cdp.collateral_ratio = i128::MAX;
         }
 
-        let mut updated_config = config;
+        let mut updated_config = config.clone();
         updated_config.total_minted -= burn_amount;
 
         env.storage().persistent().set(&cdp_key, &cdp);
         env.storage()
             .persistent()
             .set(&asset_symbol, &updated_config);
+
+        // PR #802: actually burn the user's synthetic tokens so the
+        // ledger balance matches the debt reduction recorded above.
+        TokenClient::new(&env, &config.synthetic_token).burn(&owner, &burn_amount);
+
         Ok(())
     }
 
@@ -334,21 +381,23 @@ impl SyntheticAssetsContract {
             .get(&cdp_key)
             .ok_or(Error::CDPNotFound)?;
 
-        // Pull additional collateral from owner into the contract
-        TokenClient::new(&env, &config.collateral_token).transfer(
-            &owner,
-            &env.current_contract_address(),
-            &amount,
-        );
-
         cdp.collateral_amount += amount;
 
         if cdp.minted_amount > 0 {
-            let collateral_usd = cdp.collateral_amount * 1_000_000 / config.oracle_price;
-            cdp.collateral_ratio = collateral_usd * 10000 / cdp.minted_amount;
+            if config.oracle_price <= 0 {
+                cdp.collateral_ratio = 0;
+            } else {
+                let collateral_usd =
+                    cdp.collateral_amount * 1_000_000 / config.oracle_price;
+                cdp.collateral_ratio = collateral_usd * 10000 / cdp.minted_amount;
+            }
         }
 
         env.storage().persistent().set(&cdp_key, &cdp);
+
+        // Interaction: pull additional collateral from owner into the contract.
+        TokenClient::new(&env, &config.collateral_token)
+            .transfer(&owner, &env.current_contract_address(), &amount);
 
         env.events().publish(
             (extended_topics::COLLATERAL_ADDED,),
@@ -387,7 +436,24 @@ impl SyntheticAssetsContract {
             .get(&cdp_key)
             .ok_or(Error::CDPNotFound)?;
 
-        if cdp.collateral_ratio >= config.liq_cratio {
+        // Recompute the *live* ratio from current state. `cdp.collateral_ratio`
+        // is a mint-time snapshot that is not refreshed by `update_price`, so
+        // an oracle movement is only visible through the live recomputation
+        // below:
+        //   * zero debt       => effectively infinitely healthy (MAX),
+        //                        so the CDP is never liquidatable;
+        //   * zero oracle     => immediately liquidatable (live cratio = 0);
+        //   * otherwise       => (collateral * 1e6 / price * 10000) / debt.
+        let live_cratio: i128 = if cdp.minted_amount <= 0 {
+            i128::MAX
+        } else if config.oracle_price <= 0 {
+            0
+        } else {
+            let collateral_usd =
+                cdp.collateral_amount * 1_000_000 / config.oracle_price;
+            collateral_usd * 10000 / cdp.minted_amount
+        };
+        if live_cratio >= config.liq_cratio {
             return Err(Error::NotLiquidatable);
         }
 

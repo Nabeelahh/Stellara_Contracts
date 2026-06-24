@@ -20,6 +20,18 @@ fn create_collateral_token(
     )
 }
 
+// `deploy_contract` is unused now that every test inlines its own
+// `env.register_contract(None, SyntheticAssetsContract)` and
+// `SyntheticAssetsContractClient::new` calls; keep the helper around so
+// future tests can opt into a one-liner setup without copy-pasting four
+// lines of boilerplate.
+#[allow(dead_code)]
+fn deploy_contract(env: &Env) -> (Address, SyntheticAssetsContractClient<'static>) {
+    let contract_id = env.register_contract(None, SyntheticAssetsContract);
+    let client = SyntheticAssetsContractClient::new(env, &contract_id);
+    (contract_id, client)
+}
+
 #[test]
 fn test_cdp_full_lifecycle() {
     let env = Env::default();
@@ -58,11 +70,18 @@ fn test_cdp_full_lifecycle() {
     sc.open_cdp(&user, &asset, &1500);
     assert_eq!(coll_client.balance(&user), 8500);
     assert_eq!(coll_client.balance(&contract_id), 1500);
+    // Zero-debt CDP has infinite collateralization ratio (i128::MAX).
+    let freshly_opened = sc.get_cdp(&user, &asset);
+    assert_eq!(freshly_opened.collateral_amount, 1500);
+    assert_eq!(freshly_opened.minted_amount, 0);
+    assert!(freshly_opened.is_active);
 
     // Mint 1000 synthetic tokens
     // cratio = (1500 * 1e6 / 1e6) * 10000 / 1000 = 15000 (exactly 150%)
     sc.mint(&user, &asset, &1000);
     assert_eq!(synth_client.balance(&user), 1000);
+    let cdp = sc.get_cdp(&user, &asset);
+    assert_eq!(cdp.collateral_ratio, 15000);
 
     // Burn 500 tokens — balance halves
     sc.burn(&user, &asset, &500);
@@ -142,36 +161,45 @@ fn test_liquidation_transfers_collateral_to_liquidator() {
     sc.initialize(&admin);
 
     let asset = symbol_short!("sBTC");
-    // liq_cratio (16000) > min_cratio (15000) so a position minted at exactly
-    // 150% cratio is already below the liquidation threshold — making it
-    // immediately liquidatable without needing a price feed drop.
+    // Sane band: min 150% > liq 120%. Open healthily at exactly min_cratio,
+    // then push the *live* ratio below liq_cratio by raising the oracle price
+    // (because the contract's live-ratio formula is `collateral * 1e6 / price`,
+    // a higher price makes each unit of collateral worth fewer USD and so the
+    // live ratio drops).
     sc.register_asset(
         &admin,
         &asset,
         &15000, // min_cratio: 150%
-        &16000, // liq_cratio: 160% (intentionally > min for test setup)
+        &12000, // liq_cratio: 120%
         &1300,  // liq_penalty: 13%
         &50,
         &coll_addr,
         &synth_addr,
         &86_400_u64, // price_max_age_seconds: 1 day
     );
-    sc.update_price(&admin, &asset, &1_000_000);
+    sc.update_price(&admin, &asset, &1_000_000); // $1.00 base
 
     coll_admin.mint(&user, &10000);
 
-    // Open CDP and mint at exactly 150% → stored cratio = 15000 < liq_cratio (16000)
     sc.open_cdp(&user, &asset, &1500);
+    // Mint 1000 against 1500 at oracle=1e6: live ratio = 15000.
     sc.mint(&user, &asset, &1000);
 
     assert_eq!(coll_client.balance(&user), 8500);
     assert_eq!(synth_client.balance(&user), 1000);
 
-    // Give the liquidator the synthetic tokens they need to repay the debt
-    synth_client.transfer(&user, &liquidator, &1000);
-    assert_eq!(synth_client.balance(&liquidator), 1000);
+    // First confirm `liquidate` rejects while the position is healthy.
+    let res = sc.try_liquidate(&liquidator, &user, &asset);
+    assert!(res.is_err());
 
-    // seized = 1500 - (1500 * 1300 / 10000) = 1500 - 195 = 1305
+    // Move the synthetic debt tokens to the liquidator before liquidating.
+    synth_client.transfer(&user, &liquidator, &1000_i128);
+
+    // Raise the oracle price to 1.5e6 => live_collateral_usd = 1000 =>
+    // live_cratio = 10000 < 12000 (liq_cratio): liquidatable now.
+    sc.update_price(&admin, &asset, &1_500_000);
+
+    // seized = 1500 - 1500*1300/10000 = 1500 - 195 = 1305
     let expected_seized = 1500_i128 - (1500_i128 * 1300 / 10000);
     let liq_coll_before = coll_client.balance(&liquidator);
 
