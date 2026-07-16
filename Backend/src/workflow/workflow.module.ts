@@ -12,12 +12,14 @@ import { CompensationService } from './services/compensation.service';
 import { RecoveryService } from './services/recovery.service';
 import { MonitoringService } from './services/monitoring.service';
 import { WorkflowAdminController } from './controllers/workflow-admin.controller';
+import { QueueModule } from '../queue/queue.module';
 
 @Module({
   imports: [
     ConfigModule,
     ScheduleModule.forRoot(),
     TypeOrmModule.forFeature([Workflow, WorkflowStep]),
+    QueueModule,
   ],
   controllers: [WorkflowAdminController],
   providers: [

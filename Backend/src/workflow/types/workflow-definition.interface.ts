@@ -3,6 +3,7 @@ import { WorkflowType } from './workflow-type.enum';
 
 export interface WorkflowDefinition {
   type: WorkflowType;
+  version?: number;
   name: string;
   description: string;
   steps: StepDefinition[];
