@@ -7,7 +7,6 @@ import { RefreshToken } from '../entities/refresh-token.entity';
 import { User } from '../entities/user.entity';
 import { randomUUID as uuidv4 } from 'crypto';
 import { AuditService } from '../../audit/audit.service';
-import { AuditEvent } from '../../audit/audit.event';
 import { SecretsMaskingService } from '../../config/secrets-masking.service';
 
 export interface JwtPayload {

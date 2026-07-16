@@ -3,14 +3,20 @@ import { createAdapter } from '@socket.io/redis-adapter';
 import { createClient } from 'redis';
 import { Logger } from '@nestjs/common';
 
+/** Inline URL masker — used before DI is available. */
+function maskRedisUrl(url: string): string {
+  return url.replace(/(rediss?:\/\/[^:@\s]*:)[^@\s]+(@)/gi, '$1***$2');
+}
+
 export class RedisIoAdapter extends IoAdapter {
   private adapterConstructor: ReturnType<typeof createAdapter> | undefined;
   private readonly logger = new Logger(RedisIoAdapter.name);
 
   async connectToRedis(): Promise<void> {
     const redisUrl = process.env.REDIS_URL || `redis://${process.env.REDIS_HOST || 'localhost'}:${process.env.REDIS_PORT || 6379}`;
-    
-    this.logger.log(`Initializing Redis clients at ${redisUrl}`);
+
+    // Log only the masked URL so embedded passwords never appear in logs
+    this.logger.log(`Initializing Redis clients at ${maskRedisUrl(redisUrl)}`);
 
     const socketOptions = {
       reconnectStrategy: (retries: number) => {
@@ -28,8 +34,9 @@ export class RedisIoAdapter extends IoAdapter {
     const pubClient = createClient({ url: redisUrl, socket: socketOptions });
     const subClient = pubClient.duplicate();
 
-    pubClient.on('error', (err) => this.logger.error(`Redis Pub Client Error: ${err.message}`));
-    subClient.on('error', (err) => this.logger.error(`Redis Sub Client Error: ${err.message}`));
+    // Mask error messages before logging — err.message can contain connection URLs
+    pubClient.on('error', (err) => this.logger.error(`Redis Pub Client Error: ${maskRedisUrl(err.message)}`));
+    subClient.on('error', (err) => this.logger.error(`Redis Sub Client Error: ${maskRedisUrl(err.message)}`));
 
     try {
       await Promise.all([pubClient.connect(), subClient.connect()]);
