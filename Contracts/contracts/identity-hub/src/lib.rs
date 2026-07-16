@@ -4,6 +4,7 @@ use soroban_sdk::{
 };
 use shared::governance::{GovernanceManager, GovernanceRole};
 use shared::events::{extended_topics, HubCreatedEvent, DataEntryAddedEvent, PermissionGrantedEvent, PermissionRevokedEvent, SelectiveDisclosureCreatedEvent};
+use upgradeability::full_initializer_guard;
 
 // Identity Hub data structure
 #[contracttype]
@@ -102,6 +103,9 @@ impl IdentityHubContract {
         approvers: Vec<Address>,
         executor: Address,
     ) {
+        // Guard: prevent re-initialization with re-entry protection, version tracking, and storage gap
+        full_initializer_guard(&env, 1);
+
         // Set up governance roles
         let roles_key = symbol_short!("roles");
         let mut role_map: Map<Address, GovernanceRole> = Map::new(&env);

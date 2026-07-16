@@ -2,18 +2,21 @@
 
 ## Overview
 
-This document defines the explicit upgradeability pattern for Stellara smart contracts on Soroban/Stellar. The design prioritizes security, transparency, and decentralized governance while preventing rogue upgrades through multi-signature approval and timelock mechanisms.
+This document defines the explicit upgradeability pattern for Stellara smart contracts on Soroban/Stellar. The design prioritizes security, transparency, and decentralized governance while preventing rogue upgrades through multi-signature approval, timelock mechanisms, and comprehensive initializer safety.
 
 ## 1. Upgradeability Architecture
 
-### 1.1 Design Pattern: Governance-Controlled Upgrade
+### 1.1 Design Pattern: Governance-Controlled Upgrade with Initializer Safety
 
-Stellara uses a **decentralized governance upgrade model** rather than a traditional proxy pattern. This approach:
+Stellara uses a **decentralized governance upgrade model** with enhanced initializer protection:
 
 - **Eliminates centralized admin risk**: Upgrades require multi-signature approval
 - **Provides transparency**: All upgrade proposals are on-chain and auditable
 - **Includes timelock delays**: Users have time to react before upgrades take effect
 - **Maintains simplicity**: Contracts are immutable; we manage upgradeability through governance
+- **Initializer safety**: Prevents re-initialization attacks with re-entry protection
+- **Version tracking**: Tracks contract versions for upgrade compatibility
+- **Storage gaps**: Reserves space for future storage additions without breaking compatibility
 
 ### 1.2 Contract Immutability on Stellar/Soroban
 
@@ -23,6 +26,7 @@ Since Soroban contracts are immutable once deployed:
 2. **Version management**: Contracts include a `version` field to track implementation versions
 3. **Upgrade path**: New contracts are deployed with upgraded code; governance manages the transition
 4. **Data migration**: State can be migrated through `init` and state-transfer functions
+5. **Storage layout**: Storage gaps ensure compatibility across versions
 
 ### 1.3 Architecture Diagram
 
@@ -73,6 +77,16 @@ Execution Phase
             ├─► Update version number
             ├─► Emit upgrade event
             └─► Mark proposal as executed
+
+┌─────────────────────────────────────────────────────────┐
+│         Initializer Safety Layer                         │
+│  ┌─────────────────────────────────────────────────────┐│
+│  │ • Re-entry protection (temporary storage flag)       ││
+│  │ • Double-initialization prevention                    ││
+│  │ • Version tracking (persistent storage)              ││
+│  │ • Storage gap reservation (50 bytes)                 ││
+│  └─────────────────────────────────────────────────────┘│
+└─────────────────────────────────────────────────────────┘
 ```
 
 ## 2. Security Safeguards
@@ -455,26 +469,60 @@ Time Requirements:
 
 ## 7. State Management & Upgradability
 
-### 7.1 Version Tracking
+### 7.1 Initializer Safety
 
-Each contract maintains a version:
+The upgradeability module provides comprehensive initializer protection:
 
 ```rust
-const CONTRACT_VERSION: u32 = 1;
+use upgradeability::{full_initializer_guard, initializer_guard};
 
-pub fn get_version(env: Env) -> u32 {
-    // Returns current version
+// Recommended: Full guard with version and storage gap
+pub fn initialize(env: Env, admin: Address) {
+    full_initializer_guard(&env, 1);
+    // ... initialization logic
+}
+
+// Alternative: Basic guard only
+pub fn initialize(env: Env, admin: Address) {
+    initializer_guard(&env);
+    // ... initialization logic
 }
 ```
 
+**Safety Features:**
+- **Re-entry protection**: Uses temporary storage flag to prevent re-initialization during the same call
+- **Double-initialization prevention**: Persistent storage flag prevents multiple calls
+- **Version tracking**: Automatically sets contract version
+- **Storage gap reservation**: Reserves 50 bytes for future storage additions
+
+### 7.2 Version Tracking
+
+Each contract maintains a version for upgrade compatibility:
+
+```rust
+use upgradeability::{get_contract_version, set_contract_version};
+
+// Get current version
+let version = get_contract_version(&env);
+
+// Set version (usually done by full_initializer_guard)
+set_contract_version(&env, 2);
+```
+
 **Version Schema:**
-- V1: Initial release
-- V2: Upgrade with new features
-- V3+: Subsequent improvements
+- V1: Initial release with initializer safety
+- V2: Upgrade with new features, preserves storage layout
+- V3+: Subsequent improvements with backward compatibility
 
-### 7.2 Data Migration
+**Storage Layout Compatibility:**
+- Storage gaps (50 bytes) reserved in each version
+- New storage variables added after existing ones
+- Existing storage keys never changed or removed
+- Version checks enable migration logic
 
-When deploying V2, handle state transitions:
+### 7.3 Data Migration
+
+When deploying V2, handle state transitions while preserving storage layout:
 
 ```rust
 // V1 contract: stores stats in persistent storage
@@ -483,24 +531,54 @@ pub struct TradeStats {
     pub total_volume: i128,
 }
 
-// V2 contract: extends with fees_collected
+// V2 contract: extends with fees_collected (uses storage gap)
 pub struct TradeStats {
     pub total_trades: u64,
     pub total_volume: i128,
-    pub fees_collected: i128,  // NEW in V2
+    pub fees_collected: i128,  // NEW in V2 - uses reserved gap
 }
 
 // Migration function in V2 init:
 pub fn migrate_from_v1(env: Env) {
-    let old_stats = load_old_stats(env);
-    let new_stats = TradeStats {
-        total_trades: old_stats.total_trades,
-        total_volume: old_stats.total_volume,
-        fees_collected: 0,  // Initialize new field
-    };
-    save_stats(env, new_stats);
+    let old_version = get_contract_version(&env);
+    
+    if old_version == 1 {
+        let old_stats = load_old_stats(env);
+        let new_stats = TradeStats {
+            total_trades: old_stats.total_trades,
+            total_volume: old_stats.total_volume,
+            fees_collected: 0,  // Initialize new field
+        };
+        save_stats(env, new_stats);
+        set_contract_version(&env, 2);
+    }
 }
 ```
+
+### 7.4 Storage Gap Management
+
+Storage gaps ensure future upgrades can add variables without breaking compatibility:
+
+```rust
+// Automatically initialized by full_initializer_guard
+// Reserves 50 bytes under "gap" storage key
+
+// Future version can use this space:
+pub fn initialize_v2_features(env: Env) {
+    // Use part of storage gap for new features
+    let gap_data: Bytes = env.storage().persistent()
+        .get(&symbol_short!("gap"))
+        .unwrap();
+    
+    // Parse and extend gap data for new storage
+}
+```
+
+**Benefits:**
+- No storage layout conflicts between versions
+- Backward compatibility maintained
+- Forward compatibility enabled
+- Gas-efficient storage usage
 
 ## 8. Transparency & User Communication
 
@@ -551,8 +629,80 @@ Before deploying to mainnet:
 - [ ] Documentation shared with community
 - [ ] Emergency escalation path documented
 - [ ] Monitoring alerts configured
+- [ ] **Initializer protection verified** (double-init fails)
+- [ ] **Version tracking tested** (version correctly set)
+- [ ] **Storage gap initialized** (50 bytes reserved)
+- [ ] **Re-entry protection tested** (prevents re-initialization during same call)
+- [ ] **Storage layout compatibility verified** (upgrade path tested)
 
-## 10. References
+## 10. Testing & Validation
+
+### 10.1 Initializer Safety Tests
+
+The upgradeability module includes comprehensive tests:
+
+```rust
+// Test that fresh contract is not initialized
+test_fresh_contract_is_not_initialized()
+
+// Test that mark_initialized sets flag
+test_mark_initialized_sets_flag()
+
+// Test that initializer_guard succeeds on first call
+test_initializer_guard_succeeds_on_first_call()
+
+// Test that full_initializer_guard sets version
+test_full_initializer_guard_sets_version()
+
+// Test version tracking
+test_version_tracking()
+
+// Test re-entry protection flag
+test_is_initializing_flag()
+```
+
+### 10.2 Contract-Specific Tests
+
+Each upgradeable contract includes initializer safety tests:
+
+```rust
+// DID Registry
+test_initialize_prevents_reinitialization()
+
+// Identity Hub
+test_initialize_prevents_reinitialization()
+
+// Verifiable Credentials
+test_initialize_prevents_reinitialization()
+```
+
+### 10.3 Deployment Verification
+
+The deployment script includes automatic verification:
+
+1. **Build verification**: All WASM binaries compiled successfully
+2. **Test verification**: Upgradeability module tests pass
+3. **Deployment verification**: Contracts deployed to target network
+4. **Initialization verification**: Contracts initialized with governance roles
+5. **Double-init verification**: Second initialization attempt fails
+6. **Version verification**: Contract version correctly set to 1
+
+### 10.4 Migration Testing
+
+Test upgrade flows between versions:
+
+```javascript
+// Test v1 to v2 migration
+it('should support v1 to v2 migration')
+
+// Test governance role preservation
+it('should preserve governance roles during migration')
+
+// Test contract state preservation
+it('should preserve contract state during migration')
+```
+
+## 11. References
 
 ### Soroban/Stellar Documentation
 - [Soroban Smart Contracts](https://developers.stellar.org/docs/smart-contracts)

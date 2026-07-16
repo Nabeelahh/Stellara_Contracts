@@ -8,6 +8,7 @@ use shared::events::{
     DidCreatedEvent, DidUpdatedEvent, DidDeactivatedEvent,
     VerificationMethodAddedEvent, ServiceAddedEvent,
 };
+use upgradeability::full_initializer_guard;
 
 // DID Document structure
 #[contracttype]
@@ -79,6 +80,9 @@ impl DIDRegistryContract {
         approvers: Vec<Address>,
         executor: Address,
     ) {
+        // Guard: prevent re-initialization with re-entry protection, version tracking, and storage gap
+        full_initializer_guard(&env, 1);
+
         // Set up governance roles
         let roles_key = symbol_short!("roles");
         let mut role_map: Map<Address, GovernanceRole> = Map::new(&env);

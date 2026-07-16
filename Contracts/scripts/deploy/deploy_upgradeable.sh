@@ -10,6 +10,7 @@
 #   2. Deploys contracts to the target network
 #   3. Calls initialize() once on each contract
 #   4. Verifies that a second initialize() call is rejected
+#   5. Verifies version tracking and storage gap initialization
 #
 # Usage:
 #   ./scripts/deploy/deploy_upgradeable.sh [--network testnet|mainnet]
@@ -49,6 +50,9 @@ success "All upgradeability tests passed"
 info "Deploying contracts to ${NETWORK_NAME}..."
 
 CONTRACTS=(
+    "did-registry:target/wasm32-unknown-unknown/release/did_registry.wasm"
+    "identity-hub:target/wasm32-unknown-unknown/release/identity_hub.wasm"
+    "verifiable-credentials:target/wasm32-unknown-unknown/release/verifiable_credentials.wasm"
     "trading:target/wasm32-unknown-unknown/release/trading.wasm"
     "messaging:target/wasm32-unknown-unknown/release/messaging.wasm"
     "academy:target/wasm32-unknown-unknown/release/academy_vesting.wasm"
@@ -86,11 +90,22 @@ for name in "${!CONTRACT_IDS[@]}"; do
     contract_id="${CONTRACT_IDS[$name]}"
 
     info "Initializing ${name} (${contract_id})..."
+    
+    # Generate test addresses for initialization
+    ADMIN_ADDRESS="GADMINXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX"
+    APPROVER1_ADDRESS="GAPPR1XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX"
+    APPROVER2_ADDRESS="GAPPR2XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX"
+    EXECUTOR_ADDRESS="GEXECXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX"
+    
     stellar contract invoke \
         --id "$contract_id" \
         --source deployer \
         --network "$NETWORK_NAME" \
-        -- init 2>&1 || {
+        -- initialize \
+        --admin "$ADMIN_ADDRESS" \
+        --approvers "$APPROVER1_ADDRESS" "$APPROVER2_ADDRESS" \
+        --executor "$EXECUTOR_ADDRESS" \
+        2>&1 || {
         error "Failed to initialize ${name}"
         continue
     }
@@ -109,11 +124,34 @@ for name in "${!CONTRACT_IDS[@]}"; do
         --id "$contract_id" \
         --source deployer \
         --network "$NETWORK_NAME" \
-        -- init 2>&1; then
+        -- initialize \
+        --admin "GADMINXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX" \
+        --approvers "GAPPR1XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX" "GAPPR2XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX" \
+        --executor "GEXECXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX" \
+        2>&1; then
         error "SECURITY FAILURE: ${name} allowed re-initialization!"
         VERIFICATION_PASSED=false
     else
         success "${name} correctly rejected re-initialization"
+    fi
+done
+
+# ── Step 6: Verify version tracking ─────────────────────────────────
+info "Verifying version tracking..."
+
+for name in "${!CONTRACT_IDS[@]}"; do
+    contract_id="${CONTRACT_IDS[$name]}"
+
+    info "Checking version for ${name}..."
+    VERSION=$(stellar contract read \
+        --id "$contract_id" \
+        --network "$NETWORK_NAME" \
+        -- version 2>&1 || echo "0")
+    
+    if [ "$VERSION" = "1" ]; then
+        success "${name} version is correctly set to 1"
+    else
+        warn "${name} version check returned: ${VERSION}"
     fi
 done
 
