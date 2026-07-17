@@ -17,7 +17,3 @@ members = [
     "contracts/upgradeability",
 ]
 resolver = "2"
-
-[workspace.dependencies]
-# Force compatible ethnum version for newer Rust toolchains
-ethnum = "1.5.3"

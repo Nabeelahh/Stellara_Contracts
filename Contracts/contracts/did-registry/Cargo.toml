@@ -13,7 +13,7 @@ testutils = ["soroban-sdk/testutils"]
 soroban-sdk = "20.5.0"
 shared = { path = "../../shared" }
 upgradeability = { path = "../upgradeability" }
-stellar-xdr = { version = "20.0.0", default-features = false }
+stellar-xdr = { version = "21.0.0", default-features = false }
 
 [dev-dependencies]
 soroban-sdk = { version = "20.5.0", features = ["testutils"] }
