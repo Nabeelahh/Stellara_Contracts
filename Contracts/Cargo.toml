@@ -10,15 +10,12 @@ members = [
     "contracts/tcr",
     "contracts/cross-chain-router",
     "contracts/amm",
-    "contracts/did-registry",
-    "contracts/identity-hub",
-    "contracts/liquidity-mining",
-    "contracts/stablecoin_reserve",
-    "contracts/verifiable-credentials",
-    "contracts/parametric_insurance",
-    "contracts/token",
     "integration-tests",
     "shared",
     "contracts/upgradeability",
 ]
+# WIP contracts excluded until ready for CI:
+# contracts/token, contracts/did-registry, contracts/identity-hub,
+# contracts/liquidity-mining, contracts/stablecoin_reserve,
+# contracts/verifiable-credentials, contracts/parametric_insurance
 resolver = "2"

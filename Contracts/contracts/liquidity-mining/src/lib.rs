@@ -16,7 +16,7 @@ mod storage_keys {
     pub const USER_LP_STAKE: Symbol = symbol_short!("u_lp"); // User LP balances
     pub const USER_LOCKED_REWARDS: Symbol = symbol_short!("u_locked"); // User locked rewards for governance
     pub const TOTAL_LP_STAKED: Symbol = symbol_short!("total_lp");
-    pub const LAST_REWARD_BLOCK: Symbol = symbol_short!("last_reward");
+    pub const LAST_REWARD_BLOCK: Symbol = symbol_short!("lst_rwrd");
     pub const MULTIPLIER_CONFIG: Symbol = symbol_short!("mult_cfg");
     pub const PAIR_LIST: Symbol = symbol_short!("pair_list");
     pub const INITIALIZED: Symbol = symbol_short!("init");
@@ -183,7 +183,7 @@ impl LiquidityMiningContract {
             .set(&storage_keys::TOTAL_LP_STAKED, &0i128);
         env.storage()
             .instance()
-            .set(&storage_keys::LAST_REWARD_BLOCK, &env.ledger().sequence());
+            .set(&storage_keys::LAST_REWARD_BLOCK, &(env.ledger().sequence() as u64));
 
         env.storage()
             .instance()
@@ -226,7 +226,7 @@ impl LiquidityMiningContract {
             emissions_per_block,
             total_allocated,
             accumulated_reward_per_share: 0,
-            last_update_block: current_block,
+            last_update_block: current_block as u64,
             active: true,
         };
 
@@ -668,13 +668,13 @@ impl LiquidityMiningContract {
             return Ok(0);
         }
 
-        let blocks_since_last_claim = env.ledger().sequence() - pair_config.last_update_block;
+        let blocks_since_last_claim = (env.ledger().sequence() as u64).saturating_sub(pair_config.last_update_block);
         let reward_per_block = pair_config.emissions_per_block;
-        let user_reward_share = (user_stake.lp_balance * reward_per_block * blocks_since_last_claim) / total_staked;
+        let user_reward_share = (user_stake.lp_balance * reward_per_block * blocks_since_last_claim as i128) / total_staked;
 
         // Apply bonus multiplier if applicable
         let multiplier = Self::get_bonus_multiplier(&env, user_stake.bonus_multiplier_tier)?;
-        let final_reward = (user_reward_share * multiplier) / 100;
+        let final_reward = (user_reward_share * multiplier as i128) / 100;
 
         Ok(final_reward - user_stake.reward_debt)
     }
@@ -687,7 +687,7 @@ impl LiquidityMiningContract {
             .get(&pair_key)
             .ok_or(LiquidityMiningError::InvalidPair)?;
 
-        pair_config.last_update_block = env.ledger().sequence();
+        pair_config.last_update_block = env.ledger().sequence() as u64;
         env.storage().persistent().set(&pair_key, &pair_config);
 
         Ok(())
