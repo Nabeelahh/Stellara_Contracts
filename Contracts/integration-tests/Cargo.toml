@@ -13,7 +13,7 @@ testutils = ["soroban-sdk/testutils"]
 [dependencies]
 
 [dev-dependencies]
-soroban-sdk = { version = "20.5.0", features = ["testutils"] }
+soroban-sdk = { version = "26.0.0", features = ["testutils"] }
 academy-vesting = { path = "../contracts/academy", features = ["testutils"] }
 academy-rewards = { path = "../contracts/academy-rewards", features = ["testutils"] }
 social_rewards = { path = "../contracts/social_rewards", features = ["testutils"] }

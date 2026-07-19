@@ -68,7 +68,7 @@ impl CrossChainRouter {
 
         NonceManager::enforce_sequential_nonce(&env, source_chain, env.ledger().sequence() as u64);
 
-        let message_id = env.crypto().sha256(&payload);
+        let message_id: BytesN<32> = env.crypto().sha256(&payload).into();
         let nonce = env.ledger().sequence() as u64;
 
         let message = Message {
@@ -121,7 +121,7 @@ impl CrossChainRouter {
             }
         };
 
-        let expected_hash = env.crypto().sha256(&proof);
+        let expected_hash: BytesN<32> = env.crypto().sha256(&proof).into();
         let is_valid = expected_hash == light_client.commitment_root;
 
         if is_valid {
