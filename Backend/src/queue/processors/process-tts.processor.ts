@@ -6,6 +6,7 @@ import type { Queue } from 'bull';
 import { JobResult } from '../types/job.types';
 import { ValidationError } from '../types/errors';
 import { MetricsService } from '../../observability/services/metrics.service';
+import { QueueJobTracingWrapper } from '../../observability/middleware/queue-job-tracing.wrapper';
 
 interface ProcessTtsData {
   text: string;
@@ -21,74 +22,82 @@ export class ProcessTtsProcessor {
 
   constructor(
     @InjectQueue('failed-jobs') private readonly dlqQueue: Queue,
+    private readonly queueJobTracingWrapper: QueueJobTracingWrapper,
     @Optional() @Inject(MetricsService) private readonly metrics?: MetricsService,
   ) {}
 
   @Process()
   async handleProcessTts(job: Job<ProcessTtsData>): Promise<JobResult> {
-    const { text, voiceId, language = 'en', speed = 1.0, sessionId } = job.data;
-    const start = Date.now();
+    const wrappedProcess = this.queueJobTracingWrapper.wrapProcessor(
+      async (jobToProcess: Job<ProcessTtsData>) => {
+        const { text, voiceId, language = 'en', speed = 1.0, sessionId } = jobToProcess.data;
+        const start = Date.now();
 
-    this.logger.log(
-      `Processing TTS job ${job.id}: voiceId=${voiceId}, length=${text.length}`,
+        this.logger.log(
+          `Processing TTS job ${jobToProcess.id}: voiceId=${voiceId}, length=${text.length}`,
+        );
+
+        this.metrics?.recordJobStart('process-tts');
+
+        try {
+          await jobToProcess.progress(10);
+
+          if (!text || !voiceId) {
+            throw new ValidationError('Missing required fields: text, voiceId');
+          }
+
+          if (text.length > 5000) {
+            throw new ValidationError('Text exceeds maximum length of 5000 characters');
+          }
+
+          this.logger.debug(`Processing TTS for voice ${voiceId}...`);
+          await jobToProcess.progress(30);
+
+          const preprocessedText = this.preprocessText(text);
+          await jobToProcess.progress(50);
+
+          const audioBuffer = await this.synthesizeAudio(
+            preprocessedText,
+            voiceId,
+            language,
+            speed,
+          );
+
+          await jobToProcess.progress(80);
+
+          const encodedAudio = await this.encodeAudio(audioBuffer);
+          await jobToProcess.progress(100);
+
+          this.logger.log(
+            `TTS processing completed: ${audioBuffer.length} bytes → ${encodedAudio.length} bytes (encoded)`,
+          );
+
+          const duration = (Date.now() - start) / 1000;
+          this.metrics?.recordJobCompleted('process-tts', duration);
+
+          return {
+            success: true,
+            data: {
+              audioUrl: `/audio/${jobToProcess.id}.mp3`,
+              duration: audioBuffer.length / 48000,
+              voiceId,
+              language,
+              speed,
+              sessionId,
+              processedAt: new Date().toISOString(),
+            },
+          };
+        } catch (error) {
+          const duration = (Date.now() - start) / 1000;
+          this.metrics?.recordJobFailed('process-tts', duration, error.constructor.name);
+          this.logger.error(`Failed to process TTS: ${error.message}`, error.stack);
+          throw error;
+        }
+      },
+      'process-tts',
     );
 
-    this.metrics?.recordJobStart('process-tts');
-
-    try {
-      await job.progress(10);
-
-      if (!text || !voiceId) {
-        throw new ValidationError('Missing required fields: text, voiceId');
-      }
-
-      if (text.length > 5000) {
-        throw new ValidationError('Text exceeds maximum length of 5000 characters');
-      }
-
-      this.logger.debug(`Processing TTS for voice ${voiceId}...`);
-      await job.progress(30);
-
-      const preprocessedText = this.preprocessText(text);
-      await job.progress(50);
-
-      const audioBuffer = await this.synthesizeAudio(
-        preprocessedText,
-        voiceId,
-        language,
-        speed,
-      );
-
-      await job.progress(80);
-
-      const encodedAudio = await this.encodeAudio(audioBuffer);
-      await job.progress(100);
-
-      this.logger.log(
-        `TTS processing completed: ${audioBuffer.length} bytes → ${encodedAudio.length} bytes (encoded)`,
-      );
-
-      const duration = (Date.now() - start) / 1000;
-      this.metrics?.recordJobCompleted('process-tts', duration);
-
-      return {
-        success: true,
-        data: {
-          audioUrl: `/audio/${job.id}.mp3`,
-          duration: audioBuffer.length / 48000,
-          voiceId,
-          language,
-          speed,
-          sessionId,
-          processedAt: new Date().toISOString(),
-        },
-      };
-    } catch (error) {
-      const duration = (Date.now() - start) / 1000;
-      this.metrics?.recordJobFailed('process-tts', duration, error.constructor.name);
-      this.logger.error(`Failed to process TTS: ${error.message}`, error.stack);
-      throw error;
-    }
+    return wrappedProcess(job);
   }
 
   @OnQueueFailed()

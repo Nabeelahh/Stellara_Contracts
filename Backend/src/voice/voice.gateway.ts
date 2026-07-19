@@ -16,6 +16,7 @@ import { VoiceMessageDto } from './dto/voice-message.dto';
 import { SessionActionDto } from './dto/session-action.dto';
 import { ConversationState } from './types/conversation-state.enum';
 import { WsJwtAuthGuard } from '../auth/guards/ws-jwt-auth.guard';
+import { WebSocketTracingAdapter } from '../observability/middleware/websocket-tracing.adapter';
 
 const allowedOrigins = process.env.CORS_ORIGINS
   ? process.env.CORS_ORIGINS.split(',').map((o) => o.trim())
@@ -37,6 +38,7 @@ export class VoiceGateway implements OnGatewayConnection, OnGatewayDisconnect {
   constructor(
     private readonly voiceSessionService: VoiceSessionService,
     private readonly streamingResponseService: StreamingResponseService,
+    private readonly webSocketTracingAdapter: WebSocketTracingAdapter,
   ) {}
 
   async handleConnection(client: Socket) {
@@ -48,6 +50,13 @@ export class VoiceGateway implements OnGatewayConnection, OnGatewayDisconnect {
       client.emit('voice:error', { message: 'Authentication failed' });
       client.disconnect();
       return;
+    }
+
+    // Initialize tracing for this connection
+    const traceContext = this.webSocketTracingAdapter.initializeConnection(client, '/voice');
+    if (userId) {
+      // Update trace context with user ID if available
+      traceContext.userId = userId;
     }
 
     this.logger.log(`Voice client connected: ${client.id}, userId: ${userId}`);
@@ -72,6 +81,8 @@ export class VoiceGateway implements OnGatewayConnection, OnGatewayDisconnect {
     const userId = client.data.user?.sub || client.data.user?.userId;
     const sessionId = client.handshake.auth.sessionId;
 
+    this.webSocketTracingAdapter.handleDisconnection(client.id, '/voice', 'client disconnect');
+
     this.logger.log(`Voice client disconnected: ${client.id}, userId: ${userId}`);
 
     if (userId && sessionId) {
@@ -87,6 +98,8 @@ export class VoiceGateway implements OnGatewayConnection, OnGatewayDisconnect {
   @SubscribeMessage('voice:create-session')
   async createSession(@ConnectedSocket() client: Socket, @MessageBody() createSessionDto: CreateSessionDto) {
     try {
+      this.webSocketTracingAdapter.recordMessage(client.id, '/voice', 'voice:create-session');
+
       const userId = client.data.user?.sub || client.data.user?.userId;
       if (!userId) {
         client.emit('voice:error', { message: 'Authentication required' });
@@ -138,6 +151,8 @@ export class VoiceGateway implements OnGatewayConnection, OnGatewayDisconnect {
   @SubscribeMessage('voice:message')
   async handleMessage(@ConnectedSocket() client: Socket, @MessageBody() messageDto: VoiceMessageDto) {
     try {
+      this.webSocketTracingAdapter.recordMessage(client.id, '/voice', 'voice:message');
+
       const userId = client.data.user?.sub || client.data.user?.userId;
       const sessionId = await this.voiceSessionService.getUserActiveSession(userId);
 
@@ -169,6 +184,8 @@ export class VoiceGateway implements OnGatewayConnection, OnGatewayDisconnect {
   @SubscribeMessage('voice:interrupt')
   async handleInterrupt(@ConnectedSocket() client: Socket, @MessageBody() data: { streamId?: string }) {
     try {
+      this.webSocketTracingAdapter.recordMessage(client.id, '/voice', 'voice:interrupt');
+
       const userId = client.data.user?.sub || client.data.user?.userId;
       const sessionId = await this.voiceSessionService.getUserActiveSession(userId);
 
@@ -198,6 +215,8 @@ export class VoiceGateway implements OnGatewayConnection, OnGatewayDisconnect {
   @SubscribeMessage('voice:action')
   async handleSessionAction(@ConnectedSocket() client: Socket, @MessageBody() actionDto: SessionActionDto) {
     try {
+      this.webSocketTracingAdapter.recordMessage(client.id, '/voice', 'voice:action');
+
       const userId = client.data.user?.sub || client.data.user?.userId;
       const sessionId = await this.voiceSessionService.getUserActiveSession(userId);
 
@@ -228,6 +247,8 @@ export class VoiceGateway implements OnGatewayConnection, OnGatewayDisconnect {
   @SubscribeMessage('voice:terminate')
   async handleTerminate(@ConnectedSocket() client: Socket) {
     try {
+      this.webSocketTracingAdapter.recordMessage(client.id, '/voice', 'voice:terminate');
+
       const userId = client.data.user?.sub || client.data.user?.userId;
       const sessionId = await this.voiceSessionService.getUserActiveSession(userId);
 
@@ -257,6 +278,8 @@ export class VoiceGateway implements OnGatewayConnection, OnGatewayDisconnect {
   @UseGuards(WsJwtAuthGuard)
   @SubscribeMessage('voice:ping')
   async handlePing(@ConnectedSocket() client: Socket) {
+    this.webSocketTracingAdapter.recordMessage(client.id, '/voice', 'voice:ping');
+
     const userId = client.data.user?.sub || client.data.user?.userId;
     const sessionId = await this.voiceSessionService.getUserActiveSession(userId);
 

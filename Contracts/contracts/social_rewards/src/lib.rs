@@ -259,7 +259,8 @@ mod tests {
         env: &Env,
         admin: &Address,
     ) -> (Address, TokenClient<'static>, StellarAssetClient<'static>) {
-        let address = env.register_stellar_asset_contract(admin.clone());
+        let address = env.register_stellar_asset_contract_v2(admin.clone())
+            .address();
         (
             address.clone(),
             TokenClient::new(env, &address),
@@ -280,13 +281,13 @@ mod tests {
         env.mock_all_auths();
         env.ledger().set(soroban_sdk::testutils::LedgerInfo {
             timestamp: 1_000_000,
-            protocol_version: 20,
+            protocol_version: 26,  // Updated from 20 to 26 for SDK 26.0.0
             sequence_number: 1,
             network_id: [0u8; 32],
             base_reserve: 10,
-            max_entry_ttl: 31104000,
-            min_persistent_entry_ttl: 31104000,
-            min_temp_entry_ttl: 31104000,
+            max_entry_ttl: 6_312_000,
+            min_persistent_entry_ttl: 4096,
+            min_temp_entry_ttl: 16,
         });
 
         let admin = Address::generate(&env);
@@ -296,7 +297,7 @@ mod tests {
         // Mint 10_000 reward tokens to admin (the reward pool)
         token_admin.mint(&admin, &10_000);
 
-        let contract_id = env.register_contract(None, SocialRewardsContract);
+        let contract_id = env.register(SocialRewardsContract, ());
         let client = SocialRewardsContractClient::new(&env, &contract_id);
         client.init(&admin, &token_addr);
 
@@ -396,7 +397,7 @@ mod tests {
         let admin = Address::generate(&env);
         let (token_addr, _, _) = create_token(&env, &admin);
 
-        let id = env.register_contract(None, SocialRewardsContract);
+        let id = env.register(SocialRewardsContract, ());
         let client = SocialRewardsContractClient::new(&env, &id);
         env.mock_all_auths();
         client.init(&admin, &token_addr);

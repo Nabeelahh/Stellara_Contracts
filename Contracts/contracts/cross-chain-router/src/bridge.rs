@@ -83,7 +83,7 @@ impl StellaraBridge {
         data.append(&recipient.clone().to_xdr(&env));
         data.append(&nonce.to_xdr(&env));
         
-        let deposit_id = env.crypto().sha256(&data);
+        let deposit_id: BytesN<32> = env.crypto().sha256(&data).into();
 
         env.events().publish(
             (symbol_short!("deposit"), from, asset, dest_chain),
@@ -106,7 +106,7 @@ impl StellaraBridge {
         data.append(&source_chain.to_xdr(&env));
         data.append(&nonce.to_xdr(&env));
         
-        let message_hash = env.crypto().sha256(&data);
+        let message_hash: BytesN<32> = env.crypto().sha256(&data).into();
         
         Self::verify_validator_signatures(&env, &message_hash, &signatures, config.validator_threshold);
 

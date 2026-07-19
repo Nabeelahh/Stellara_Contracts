@@ -1,10 +1,9 @@
-import {
-  Injectable,
-  CanActivate,
-  ExecutionContext,
-  ForbiddenException,
-} from '@nestjs/common';
+import { CanActivate, ExecutionContext, Injectable } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
+import {
+  ForbiddenError,
+  InsufficientRoleError,
+} from '../../common/exceptions/api-error.exception';
 
 export const ROLES_KEY = 'roles';
 
@@ -23,6 +22,15 @@ export const Roles = (...roles: string[]) => {
   };
 };
 
+/**
+ * Guard that enforces role-based access control for auth-module routes.
+ *
+ * Throws typed `ApiError` sub-classes so the `HttpExceptionFilter` can
+ * render the standard error envelope:
+ *
+ * - No user / no role → `ForbiddenError`     (403, FORBIDDEN)
+ * - Wrong role        → `InsufficientRoleError` (403, INSUFFICIENT_ROLE)
+ */
 @Injectable()
 export class RolesGuard implements CanActivate {
   constructor(private readonly reflector: Reflector) {}
@@ -41,15 +49,13 @@ export class RolesGuard implements CanActivate {
     const user = request.user;
 
     if (!user || !user.role) {
-      throw new ForbiddenException('User role not found');
+      throw new ForbiddenError('User role not found');
     }
 
     const hasRole = requiredRoles.includes(user.role);
 
     if (!hasRole) {
-      throw new ForbiddenException(
-        `Required role: ${requiredRoles.join(' or ')}. User has: ${user.role}`,
-      );
+      throw new InsufficientRoleError(requiredRoles, user.role);
     }
 
     return true;

@@ -3,6 +3,8 @@ import { InjectQueue } from '@nestjs/bull';
 import type { Queue, Job } from 'bull';
 import { JobData, JobResult, JobStatus, JobInfo } from '../types/job.types';
 import { RedisService } from '../../redis/redis.service';
+import { QueueJobTracingWrapper } from '../../observability/middleware/queue-job-tracing.wrapper';
+import { TraceContext } from '../../observability/types/trace-context.interface';
 
 @Injectable()
 export class QueueService {
@@ -16,6 +18,7 @@ export class QueueService {
     @InjectQueue('process-tts') private processTtsQueue: Queue,
     @InjectQueue('index-market-news') private indexMarketNewsQueue: Queue,
     private readonly redisService: RedisService,
+    private readonly queueJobTracingWrapper: QueueJobTracingWrapper,
   ) {
     this.initializeQueues();
   }
@@ -62,9 +65,17 @@ export class QueueService {
     jobName: string,
     data: T,
     options: any = {},
+    parentTraceContext?: TraceContext,
   ): Promise<Job<T>> {
     const queue = this.getQueueByName(queueName);
-    const job = await queue.add(jobName, data, {
+
+    // Inject trace context if parentTraceContext is provided
+    let jobData = data;
+    if (parentTraceContext) {
+      jobData = this.queueJobTracingWrapper.injectTraceContext(data, parentTraceContext);
+    }
+
+    const job = await queue.add(jobName, jobData, {
       removeOnComplete: false, // Keep completed jobs for tracking
       removeOnFail: false, // Keep failed jobs for analysis
       ...options,

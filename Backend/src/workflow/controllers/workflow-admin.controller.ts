@@ -5,8 +5,6 @@ import {
   Param,
   Body,
   Query,
-  HttpException,
-  HttpStatus,
   UseGuards,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiParam } from '@nestjs/swagger';
@@ -20,6 +18,15 @@ import { WorkflowExecutionService } from '../services/workflow-execution.service
 import { CompensationService } from '../services/compensation.service';
 import { RecoveryService } from '../services/recovery.service';
 import { MonitoringService } from '../services/monitoring.service';
+import {
+  WorkflowNotFoundError,
+  WorkflowInvalidStateError,
+  StepNotFoundError,
+  StepInvalidStateError,
+  ApiError,
+  ApiErrorCode,
+} from '../../common/exceptions/api-error.exception';
+import { HttpStatus } from '@nestjs/common';
 
 @ApiTags('workflow-admin')
 @Controller('admin/workflows')
@@ -77,7 +84,20 @@ export class WorkflowAdminController {
   @ApiOperation({ summary: 'Get workflow by ID' })
   @ApiParam({ name: 'id', description: 'Workflow ID' })
   @ApiResponse({ status: 200, description: 'Workflow details' })
-  @ApiResponse({ status: 404, description: 'Workflow not found' })
+  @ApiResponse({
+    status: 404,
+    description: 'Workflow not found',
+    schema: {
+      properties: {
+        success: { type: 'boolean', example: false },
+        statusCode: { type: 'number', example: 404 },
+        errorCode: { type: 'string', example: 'WORKFLOW_NOT_FOUND' },
+        message: { type: 'string', example: "Workflow '123' not found" },
+        timestamp: { type: 'string', format: 'date-time' },
+        path: { type: 'string' },
+      },
+    },
+  })
   async getWorkflow(@Param('id') id: string) {
     const workflow = await this.workflowRepository.findOne({
       where: { id },
@@ -85,7 +105,7 @@ export class WorkflowAdminController {
     });
 
     if (!workflow) {
-      throw new HttpException('Workflow not found', HttpStatus.NOT_FOUND);
+      throw new WorkflowNotFoundError(id);
     }
 
     return workflow;
@@ -95,6 +115,7 @@ export class WorkflowAdminController {
   @ApiOperation({ summary: 'Get workflow execution timeline' })
   @ApiParam({ name: 'id', description: 'Workflow ID' })
   @ApiResponse({ status: 200, description: 'Workflow timeline' })
+  @ApiResponse({ status: 404, description: 'Workflow not found' })
   async getWorkflowTimeline(@Param('id') id: string) {
     const workflow = await this.workflowRepository.findOne({
       where: { id },
@@ -102,7 +123,7 @@ export class WorkflowAdminController {
     });
 
     if (!workflow) {
-      throw new HttpException('Workflow not found', HttpStatus.NOT_FOUND);
+      throw new WorkflowNotFoundError(id);
     }
 
     const timeline: any[] = [
@@ -204,13 +225,28 @@ export class WorkflowAdminController {
   @ApiOperation({ summary: 'Retry a failed workflow' })
   @ApiParam({ name: 'id', description: 'Workflow ID' })
   @ApiResponse({ status: 200, description: 'Workflow retry initiated' })
-  @ApiResponse({ status: 400, description: 'Workflow cannot be retried' })
+  @ApiResponse({
+    status: 400,
+    description: 'Workflow cannot be retried',
+    schema: {
+      properties: {
+        success: { type: 'boolean', example: false },
+        statusCode: { type: 'number', example: 400 },
+        errorCode: { type: 'string', example: 'WORKFLOW_INVALID_STATE' },
+        message: { type: 'string', example: 'Workflow is not in a failed state' },
+        timestamp: { type: 'string', format: 'date-time' },
+        path: { type: 'string' },
+      },
+    },
+  })
   async retryWorkflow(@Param('id') id: string) {
     try {
       await this.workflowExecutionService.retryWorkflow(id);
       return { message: 'Workflow retry initiated', workflowId: id };
     } catch (error) {
-      throw new HttpException(error.message, HttpStatus.BAD_REQUEST);
+      // Re-throw ApiErrors directly; wrap plain errors as domain errors
+      if (error instanceof ApiError) throw error;
+      throw new WorkflowInvalidStateError(error.message);
     }
   }
 
@@ -218,13 +254,27 @@ export class WorkflowAdminController {
   @ApiOperation({ summary: 'Cancel a workflow' })
   @ApiParam({ name: 'id', description: 'Workflow ID' })
   @ApiResponse({ status: 200, description: 'Workflow cancelled' })
-  @ApiResponse({ status: 400, description: 'Workflow cannot be cancelled' })
+  @ApiResponse({
+    status: 400,
+    description: 'Workflow cannot be cancelled',
+    schema: {
+      properties: {
+        success: { type: 'boolean', example: false },
+        statusCode: { type: 'number', example: 400 },
+        errorCode: { type: 'string', example: 'WORKFLOW_INVALID_STATE' },
+        message: { type: 'string', example: 'Workflow cannot be cancelled in its current state' },
+        timestamp: { type: 'string', format: 'date-time' },
+        path: { type: 'string' },
+      },
+    },
+  })
   async cancelWorkflow(@Param('id') id: string) {
     try {
       await this.workflowExecutionService.cancelWorkflow(id);
       return { message: 'Workflow cancelled', workflowId: id };
     } catch (error) {
-      throw new HttpException(error.message, HttpStatus.BAD_REQUEST);
+      if (error instanceof ApiError) throw error;
+      throw new WorkflowInvalidStateError(error.message);
     }
   }
 
@@ -232,13 +282,27 @@ export class WorkflowAdminController {
   @ApiOperation({ summary: 'Compensate a workflow' })
   @ApiParam({ name: 'id', description: 'Workflow ID' })
   @ApiResponse({ status: 200, description: 'Workflow compensation initiated' })
-  @ApiResponse({ status: 400, description: 'Workflow cannot be compensated' })
+  @ApiResponse({
+    status: 400,
+    description: 'Workflow cannot be compensated',
+    schema: {
+      properties: {
+        success: { type: 'boolean', example: false },
+        statusCode: { type: 'number', example: 400 },
+        errorCode: { type: 'string', example: 'COMPENSATION_FAILED' },
+        message: { type: 'string', example: 'Compensation failed' },
+        timestamp: { type: 'string', format: 'date-time' },
+        path: { type: 'string' },
+      },
+    },
+  })
   async compensateWorkflow(@Param('id') id: string) {
     try {
       await this.compensationService.compensateWorkflow(id);
       return { message: 'Workflow compensation initiated', workflowId: id };
     } catch (error) {
-      throw new HttpException(error.message, HttpStatus.BAD_REQUEST);
+      if (error instanceof ApiError) throw error;
+      throw new ApiError(HttpStatus.BAD_REQUEST, ApiErrorCode.COMPENSATION_FAILED, error.message);
     }
   }
 
@@ -247,7 +311,20 @@ export class WorkflowAdminController {
   @ApiParam({ name: 'id', description: 'Workflow ID' })
   @ApiParam({ name: 'stepId', description: 'Step ID' })
   @ApiResponse({ status: 200, description: 'Step details' })
-  @ApiResponse({ status: 404, description: 'Step not found' })
+  @ApiResponse({
+    status: 404,
+    description: 'Step not found',
+    schema: {
+      properties: {
+        success: { type: 'boolean', example: false },
+        statusCode: { type: 'number', example: 404 },
+        errorCode: { type: 'string', example: 'STEP_NOT_FOUND' },
+        message: { type: 'string', example: "Step 'abc' not found" },
+        timestamp: { type: 'string', format: 'date-time' },
+        path: { type: 'string' },
+      },
+    },
+  })
   async getWorkflowStep(
     @Param('id') workflowId: string,
     @Param('stepId') stepId: string,
@@ -257,7 +334,7 @@ export class WorkflowAdminController {
     });
 
     if (!step) {
-      throw new HttpException('Step not found', HttpStatus.NOT_FOUND);
+      throw new StepNotFoundError(stepId);
     }
 
     return step;
@@ -269,6 +346,7 @@ export class WorkflowAdminController {
   @ApiParam({ name: 'stepId', description: 'Step ID' })
   @ApiResponse({ status: 200, description: 'Step retry initiated' })
   @ApiResponse({ status: 400, description: 'Step cannot be retried' })
+  @ApiResponse({ status: 404, description: 'Step not found' })
   async retryWorkflowStep(
     @Param('id') workflowId: string,
     @Param('stepId') stepId: string,
@@ -278,14 +356,11 @@ export class WorkflowAdminController {
     });
 
     if (!step) {
-      throw new HttpException('Step not found', HttpStatus.NOT_FOUND);
+      throw new StepNotFoundError(stepId);
     }
 
     if (step.state !== StepState.FAILED) {
-      throw new HttpException(
-        'Step is not in a failed state',
-        HttpStatus.BAD_REQUEST,
-      );
+      throw new StepInvalidStateError('Step is not in a failed state');
     }
 
     // Reset step state
@@ -386,6 +461,20 @@ export class WorkflowAdminController {
   @Post('recovery/trigger')
   @ApiOperation({ summary: 'Trigger manual recovery process' })
   @ApiResponse({ status: 200, description: 'Recovery process initiated' })
+  @ApiResponse({
+    status: 500,
+    description: 'Recovery process failed',
+    schema: {
+      properties: {
+        success: { type: 'boolean', example: false },
+        statusCode: { type: 'number', example: 500 },
+        errorCode: { type: 'string', example: 'RECOVERY_FAILED' },
+        message: { type: 'string' },
+        timestamp: { type: 'string', format: 'date-time' },
+        path: { type: 'string' },
+      },
+    },
+  })
   async triggerRecovery() {
     try {
       const results = await this.recoveryService.triggerManualRecovery();
@@ -394,7 +483,8 @@ export class WorkflowAdminController {
         results,
       };
     } catch (error) {
-      throw new HttpException(error.message, HttpStatus.INTERNAL_SERVER_ERROR);
+      if (error instanceof ApiError) throw error;
+      throw new ApiError(HttpStatus.INTERNAL_SERVER_ERROR, ApiErrorCode.RECOVERY_FAILED, error.message);
     }
   }
 
@@ -414,7 +504,8 @@ export class WorkflowAdminController {
         systemHealth,
       };
     } catch (error) {
-      throw new HttpException(error.message, HttpStatus.INTERNAL_SERVER_ERROR);
+      if (error instanceof ApiError) throw error;
+      throw new ApiError(HttpStatus.INTERNAL_SERVER_ERROR, ApiErrorCode.INTERNAL_SERVER_ERROR, error.message);
     }
   }
 
@@ -426,7 +517,8 @@ export class WorkflowAdminController {
       const health = await this.monitoringService.getSystemHealth();
       return health;
     } catch (error) {
-      throw new HttpException(error.message, HttpStatus.INTERNAL_SERVER_ERROR);
+      if (error instanceof ApiError) throw error;
+      throw new ApiError(HttpStatus.INTERNAL_SERVER_ERROR, ApiErrorCode.INTERNAL_SERVER_ERROR, error.message);
     }
   }
 
@@ -439,7 +531,8 @@ export class WorkflowAdminController {
         await this.compensationService.getCompensatableWorkflows();
       return { workflows };
     } catch (error) {
-      throw new HttpException(error.message, HttpStatus.INTERNAL_SERVER_ERROR);
+      if (error instanceof ApiError) throw error;
+      throw new ApiError(HttpStatus.INTERNAL_SERVER_ERROR, ApiErrorCode.INTERNAL_SERVER_ERROR, error.message);
     }
   }
 
@@ -447,13 +540,27 @@ export class WorkflowAdminController {
   @ApiOperation({ summary: 'Force compensate a workflow (admin only)' })
   @ApiParam({ name: 'id', description: 'Workflow ID' })
   @ApiResponse({ status: 200, description: 'Force compensation initiated' })
-  @ApiResponse({ status: 400, description: 'Force compensation failed' })
+  @ApiResponse({
+    status: 400,
+    description: 'Force compensation failed',
+    schema: {
+      properties: {
+        success: { type: 'boolean', example: false },
+        statusCode: { type: 'number', example: 400 },
+        errorCode: { type: 'string', example: 'COMPENSATION_FAILED' },
+        message: { type: 'string' },
+        timestamp: { type: 'string', format: 'date-time' },
+        path: { type: 'string' },
+      },
+    },
+  })
   async forceCompensateWorkflow(@Param('id') id: string) {
     try {
       await this.compensationService.forceCompensateWorkflow(id);
       return { message: 'Force compensation completed', workflowId: id };
     } catch (error) {
-      throw new HttpException(error.message, HttpStatus.BAD_REQUEST);
+      if (error instanceof ApiError) throw error;
+      throw new ApiError(HttpStatus.BAD_REQUEST, ApiErrorCode.COMPENSATION_FAILED, error.message);
     }
   }
 }

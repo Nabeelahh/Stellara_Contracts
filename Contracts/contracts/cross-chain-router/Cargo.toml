@@ -10,12 +10,12 @@ crate-type = ["cdylib", "rlib"]
 testutils = ["soroban-sdk/testutils"]
 
 [dependencies]
-soroban-sdk = "20.5.0"
-soroban-spec = "20.5.0"
+soroban-sdk = "26.0.0"
+soroban-spec = "26.0.0"
 shared = { path = "../../shared" }
 
 [dev-dependencies]
-soroban-sdk = { version = "20.5.0", features = ["testutils"] }
+soroban-sdk = { version = "26.0.0", features = ["testutils"] }
 
 [profile.release]
 opt-level = "z"

@@ -7,6 +7,8 @@ import { VoiceJob, JobStatus } from './entities/voice-job.entity';
 import { VoiceService } from './services/voice.service';
 import * as fs from 'fs/promises';
 import * as path from 'path';
+import { QueueJobTracingWrapper } from '../observability/middleware/queue-job-tracing.wrapper';
+import { MetricsService } from '../observability/services/metrics.service';
 
 @Processor('voice-processing')
 export class VoiceProcessor {
@@ -14,70 +16,102 @@ export class VoiceProcessor {
     @InjectRepository(VoiceJob)
     private voiceJobRepository: Repository<VoiceJob>,
     private voiceService: VoiceService,
+    private readonly queueJobTracingWrapper: QueueJobTracingWrapper,
+    private readonly metricsService: MetricsService,
   ) {}
 
   @Process('process-stt')
   async handleSTT(job: Job) {
-    const { jobId } = job.data;
+    const wrappedProcess = this.queueJobTracingWrapper.wrapProcessor(
+      async (jobToProcess: Job) => {
+        const { jobId } = jobToProcess.data;
+        const start = Date.now();
 
-    try {
-      const voiceJob = await this.voiceJobRepository.findOne({
-        where: { id: jobId },
-      });
-      if (!voiceJob) throw new Error('Job not found');
+        this.metricsService.recordJobStart('voice-processing');
 
-      await this.voiceService.updateJobStatus(jobId, JobStatus.PROCESSING);
+        try {
+          const voiceJob = await this.voiceJobRepository.findOne({
+            where: { id: jobId },
+          });
+          if (!voiceJob) throw new Error('Job not found');
 
-      // Simulate Whisper API call
-      const transcribedText = await this.transcribeAudio(voiceJob.audioUrl);
+          await this.voiceService.updateJobStatus(jobId, JobStatus.PROCESSING);
 
-      await this.voiceService.updateJobStatus(jobId, JobStatus.COMPLETED, {
-        transcribedText,
-      });
-    } catch (error: any) {
-      const canRetry = await this.voiceService.incrementRetry(jobId);
+          // Simulate Whisper API call
+          const transcribedText = await this.transcribeAudio(voiceJob.audioUrl);
 
-      if (canRetry) {
-        await this.voiceService.updateJobStatus(jobId, JobStatus.PENDING);
-        throw error; // Bull will retry
-      } else {
-        await this.voiceService.updateJobStatus(jobId, JobStatus.FAILED, {
-          errorMessage: error.message,
-        });
-      }
-    }
+          await this.voiceService.updateJobStatus(jobId, JobStatus.COMPLETED, {
+            transcribedText,
+          });
+
+          const duration = (Date.now() - start) / 1000;
+          this.metricsService.recordJobCompleted('voice-processing', duration);
+        } catch (error: any) {
+          const duration = (Date.now() - start) / 1000;
+          this.metricsService.recordJobFailed('voice-processing', duration, error.constructor.name);
+          const canRetry = await this.voiceService.incrementRetry(jobId);
+
+          if (canRetry) {
+            await this.voiceService.updateJobStatus(jobId, JobStatus.PENDING);
+            throw error; // Bull will retry
+          } else {
+            await this.voiceService.updateJobStatus(jobId, JobStatus.FAILED, {
+              errorMessage: error.message,
+            });
+          }
+        }
+      },
+      'voice-processing',
+    );
+
+    return wrappedProcess(job);
   }
 
   @Process('process-tts')
   async handleTTS(job: Job) {
-    const { jobId } = job.data;
+    const wrappedProcess = this.queueJobTracingWrapper.wrapProcessor(
+      async (jobToProcess: Job) => {
+        const { jobId } = jobToProcess.data;
+        const start = Date.now();
 
-    try {
-      const voiceJob = await this.voiceJobRepository.findOne({
-        where: { id: jobId },
-      });
-      if (!voiceJob) throw new Error('Job not found');
+        this.metricsService.recordJobStart('voice-processing');
 
-      await this.voiceService.updateJobStatus(jobId, JobStatus.PROCESSING);
+        try {
+          const voiceJob = await this.voiceJobRepository.findOne({
+            where: { id: jobId },
+          });
+          if (!voiceJob) throw new Error('Job not found');
 
-      // Simulate TTS API call
-      const audioPath = await this.generateSpeech(voiceJob.inputText || '');
+          await this.voiceService.updateJobStatus(jobId, JobStatus.PROCESSING);
 
-      await this.voiceService.updateJobStatus(jobId, JobStatus.COMPLETED, {
-        generatedAudioUrl: audioPath,
-      });
-    } catch (error: any) {
-      const canRetry = await this.voiceService.incrementRetry(jobId);
+          // Simulate TTS API call
+          const audioPath = await this.generateSpeech(voiceJob.inputText || '');
 
-      if (canRetry) {
-        await this.voiceService.updateJobStatus(jobId, JobStatus.PENDING);
-        throw error; // Bull will retry
-      } else {
-        await this.voiceService.updateJobStatus(jobId, JobStatus.FAILED, {
-          errorMessage: error.message,
-        });
-      }
-    }
+          await this.voiceService.updateJobStatus(jobId, JobStatus.COMPLETED, {
+            generatedAudioUrl: audioPath,
+          });
+
+          const duration = (Date.now() - start) / 1000;
+          this.metricsService.recordJobCompleted('voice-processing', duration);
+        } catch (error: any) {
+          const duration = (Date.now() - start) / 1000;
+          this.metricsService.recordJobFailed('voice-processing', duration, error.constructor.name);
+          const canRetry = await this.voiceService.incrementRetry(jobId);
+
+          if (canRetry) {
+            await this.voiceService.updateJobStatus(jobId, JobStatus.PENDING);
+            throw error; // Bull will retry
+          } else {
+            await this.voiceService.updateJobStatus(jobId, JobStatus.FAILED, {
+              errorMessage: error.message,
+            });
+          }
+        }
+      },
+      'voice-processing',
+    );
+
+    return wrappedProcess(job);
   }
 
   private async transcribeAudio(audioPath: string | null): Promise<string> {

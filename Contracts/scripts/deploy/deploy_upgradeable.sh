@@ -46,8 +46,8 @@ info "Running upgradeability module tests..."
 cargo test -p upgradeability -- --test-threads=1
 success "All upgradeability tests passed"
 
-# ── Step 3: Deploy contracts ─────────────────────────────────────────
-info "Deploying contracts to ${NETWORK_NAME}..."
+# ── Step 3: Deploy Soroban contracts ──────────────────────────────────
+info "Deploying Soroban contracts to ${NETWORK_NAME}..."
 
 CONTRACTS=(
     "did-registry:target/wasm32-unknown-unknown/release/did_registry.wasm"

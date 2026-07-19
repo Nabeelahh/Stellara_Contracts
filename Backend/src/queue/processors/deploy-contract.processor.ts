@@ -6,6 +6,7 @@ import type { Queue } from 'bull';
 import { JobResult } from '../types/job.types';
 import { ValidationError, TransientError } from '../types/errors';
 import { MetricsService } from '../../observability/services/metrics.service';
+import { QueueJobTracingWrapper } from '../../observability/middleware/queue-job-tracing.wrapper';
 
 interface DeployContractData {
   contractName: string;
@@ -20,77 +21,86 @@ export class DeployContractProcessor {
 
   constructor(
     @InjectQueue('failed-jobs') private readonly dlqQueue: Queue,
+    private readonly queueJobTracingWrapper: QueueJobTracingWrapper,
     @Optional() @Inject(MetricsService) private readonly metrics?: MetricsService,
   ) {}
 
   @Process()
   async handleDeployContract(job: Job<DeployContractData>): Promise<JobResult> {
-    const { contractName, contractCode, network, initializer } = job.data;
-    const start = Date.now();
+    // Wrap the actual processing in the tracing wrapper
+    const wrappedProcess = this.queueJobTracingWrapper.wrapProcessor(
+      async (jobToProcess: Job<DeployContractData>) => {
+        const { contractName, contractCode, network, initializer } = jobToProcess.data;
+        const start = Date.now();
 
-    this.logger.log(
-      `Processing deploy-contract job ${job.id}: ${contractName} on ${network}`,
+        this.logger.log(
+          `Processing deploy-contract job ${jobToProcess.id}: ${contractName} on ${network}`,
+        );
+
+        this.metrics?.recordJobStart('deploy-contract');
+
+        try {
+          await jobToProcess.progress(10);
+
+          if (!contractName || !contractCode || !network) {
+            throw new ValidationError(
+              'Missing required fields: contractName, contractCode, network',
+            );
+          }
+
+          this.logger.debug(`Deploying contract ${contractName}...`);
+          await jobToProcess.progress(30);
+
+          const compilationResult = await this.compileContract(contractCode);
+          if (!compilationResult.success) {
+            throw new TransientError(`Compilation failed: ${compilationResult.error}`);
+          }
+
+          await jobToProcess.progress(50);
+
+          const deploymentResult = await this.deployToNetwork(
+            compilationResult.bytecode!,
+            network,
+            initializer,
+          );
+
+          await jobToProcess.progress(90);
+
+          if (deploymentResult.contractAddress) {
+            this.logger.log(
+              `Contract deployed successfully at ${deploymentResult.contractAddress}`,
+            );
+          }
+
+          await jobToProcess.progress(100);
+
+          const duration = (Date.now() - start) / 1000;
+          this.metrics?.recordJobCompleted('deploy-contract', duration);
+
+          return {
+            success: true,
+            data: {
+              contractAddress: deploymentResult.contractAddress,
+              transactionHash: deploymentResult.transactionHash,
+              network,
+              contractName,
+              deployedAt: new Date().toISOString(),
+            },
+          };
+        } catch (error) {
+          const duration = (Date.now() - start) / 1000;
+          this.metrics?.recordJobFailed('deploy-contract', duration, error.constructor.name);
+          this.logger.error(
+            `Failed to deploy contract: ${error.message}`,
+            error.stack,
+          );
+          throw error;
+        }
+      },
+      'deploy-contract',
     );
 
-    this.metrics?.recordJobStart('deploy-contract');
-
-    try {
-      await job.progress(10);
-
-      if (!contractName || !contractCode || !network) {
-        throw new ValidationError(
-          'Missing required fields: contractName, contractCode, network',
-        );
-      }
-
-      this.logger.debug(`Deploying contract ${contractName}...`);
-      await job.progress(30);
-
-      const compilationResult = await this.compileContract(contractCode);
-      if (!compilationResult.success) {
-        throw new TransientError(`Compilation failed: ${compilationResult.error}`);
-      }
-
-      await job.progress(50);
-
-      const deploymentResult = await this.deployToNetwork(
-        compilationResult.bytecode!,
-        network,
-        initializer,
-      );
-
-      await job.progress(90);
-
-      if (deploymentResult.contractAddress) {
-        this.logger.log(
-          `Contract deployed successfully at ${deploymentResult.contractAddress}`,
-        );
-      }
-
-      await job.progress(100);
-
-      const duration = (Date.now() - start) / 1000;
-      this.metrics?.recordJobCompleted('deploy-contract', duration);
-
-      return {
-        success: true,
-        data: {
-          contractAddress: deploymentResult.contractAddress,
-          transactionHash: deploymentResult.transactionHash,
-          network,
-          contractName,
-          deployedAt: new Date().toISOString(),
-        },
-      };
-    } catch (error) {
-      const duration = (Date.now() - start) / 1000;
-      this.metrics?.recordJobFailed('deploy-contract', duration, error.constructor.name);
-      this.logger.error(
-        `Failed to deploy contract: ${error.message}`,
-        error.stack,
-      );
-      throw error;
-    }
+    return wrappedProcess(job);
   }
 
   /**

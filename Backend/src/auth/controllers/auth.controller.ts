@@ -31,6 +31,11 @@ import { JwtAuthGuard } from '../guards/jwt-auth.guard';
 import { RateLimitGuard, RateLimit } from '../guards/rate-limit.guard';
 import { ConfigService } from '@nestjs/config';
 import { AuditService } from '../../audit/audit.service';
+import {
+  InvalidSignatureError,
+  NotFoundError,
+  ApiErrorCode,
+} from '../../common/exceptions/api-error.exception';
 
 @ApiTags('Authentication')
 @Controller('auth')
@@ -54,13 +59,35 @@ export class AuthController {
     description: 'Nonce generated successfully',
     schema: {
       properties: {
-        nonce: { type: 'string' },
-        expiresAt: { type: 'string', format: 'date-time' },
-        message: { type: 'string' },
+        success: { type: 'boolean', example: true },
+        statusCode: { type: 'number', example: 200 },
+        data: {
+          type: 'object',
+          properties: {
+            nonce: { type: 'string' },
+            expiresAt: { type: 'string', format: 'date-time' },
+            message: { type: 'string' },
+          },
+        },
+        timestamp: { type: 'string', format: 'date-time' },
+        path: { type: 'string' },
       },
     },
   })
-  @ApiResponse({ status: 429, description: 'Too many requests' })
+  @ApiResponse({
+    status: 429,
+    description: 'Too many requests',
+    schema: {
+      properties: {
+        success: { type: 'boolean', example: false },
+        statusCode: { type: 'number', example: 429 },
+        errorCode: { type: 'string', example: 'RATE_LIMIT_EXCEEDED' },
+        message: { type: 'string', example: 'Too many requests. Please slow down.' },
+        timestamp: { type: 'string', format: 'date-time' },
+        path: { type: 'string' },
+      },
+    },
+  })
   async requestNonce(@Body() dto: RequestNonceDto) {
     return await this.nonceService.generateNonce(dto.publicKey);
   }
@@ -75,21 +102,43 @@ export class AuthController {
     description: 'Login successful',
     schema: {
       properties: {
-        accessToken: { type: 'string' },
-        refreshToken: { type: 'string' },
-        user: {
+        success: { type: 'boolean', example: true },
+        statusCode: { type: 'number', example: 200 },
+        data: {
           type: 'object',
           properties: {
-            id: { type: 'string' },
-            email: { type: 'string', nullable: true },
-            username: { type: 'string', nullable: true },
-            createdAt: { type: 'string', format: 'date-time' },
+            accessToken: { type: 'string' },
+            refreshToken: { type: 'string' },
+            user: {
+              type: 'object',
+              properties: {
+                id: { type: 'string' },
+                email: { type: 'string', nullable: true },
+                username: { type: 'string', nullable: true },
+                createdAt: { type: 'string', format: 'date-time' },
+              },
+            },
           },
         },
+        timestamp: { type: 'string', format: 'date-time' },
+        path: { type: 'string' },
       },
     },
   })
-  @ApiResponse({ status: 401, description: 'Invalid signature or nonce' })
+  @ApiResponse({
+    status: 401,
+    description: 'Invalid signature or nonce',
+    schema: {
+      properties: {
+        success: { type: 'boolean', example: false },
+        statusCode: { type: 'number', example: 401 },
+        errorCode: { type: 'string', example: 'INVALID_SIGNATURE' },
+        message: { type: 'string', example: 'Invalid wallet signature' },
+        timestamp: { type: 'string', format: 'date-time' },
+        path: { type: 'string' },
+      },
+    },
+  })
   @ApiResponse({ status: 429, description: 'Too many requests' })
   async walletLogin(@Body() dto: WalletLoginDto) {
     // Validate nonce
@@ -109,7 +158,7 @@ export class AuthController {
     );
 
     if (!isValid) {
-      throw new Error('Invalid signature');
+      throw new InvalidSignatureError('Invalid wallet signature');
     }
 
     // Mark nonce as used
@@ -117,10 +166,6 @@ export class AuthController {
 
     // Find or create user
     let user = await this.walletService.findUserByWallet(dto.publicKey);
-
-    // if (!user) {
-    //   user = await this.walletService.createUserWithWallet(dto.publicKey);
-    // }
 
     let isNewUser = false;
 
@@ -166,12 +211,34 @@ export class AuthController {
     description: 'Token refreshed successfully',
     schema: {
       properties: {
-        accessToken: { type: 'string' },
-        refreshToken: { type: 'string' },
+        success: { type: 'boolean', example: true },
+        statusCode: { type: 'number', example: 200 },
+        data: {
+          type: 'object',
+          properties: {
+            accessToken: { type: 'string' },
+            refreshToken: { type: 'string' },
+          },
+        },
+        timestamp: { type: 'string', format: 'date-time' },
+        path: { type: 'string' },
       },
     },
   })
-  @ApiResponse({ status: 401, description: 'Invalid or expired refresh token' })
+  @ApiResponse({
+    status: 401,
+    description: 'Invalid or expired refresh token',
+    schema: {
+      properties: {
+        success: { type: 'boolean', example: false },
+        statusCode: { type: 'number', example: 401 },
+        errorCode: { type: 'string', example: 'TOKEN_INVALID' },
+        message: { type: 'string', example: 'Invalid or expired refresh token' },
+        timestamp: { type: 'string', format: 'date-time' },
+        path: { type: 'string' },
+      },
+    },
+  })
   @ApiResponse({ status: 429, description: 'Too many requests' })
   async refreshToken(@Body() dto: RefreshTokenDto) {
     const tokens = await this.jwtAuthService.refreshAccessToken(
@@ -189,7 +256,24 @@ export class AuthController {
   @ApiBearerAuth()
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Logout and revoke refresh tokens' })
-  @ApiResponse({ status: 200, description: 'Logged out successfully' })
+  @ApiResponse({
+    status: 200,
+    description: 'Logged out successfully',
+    schema: {
+      properties: {
+        success: { type: 'boolean', example: true },
+        statusCode: { type: 'number', example: 200 },
+        data: {
+          type: 'object',
+          properties: {
+            message: { type: 'string', example: 'Logged out successfully' },
+          },
+        },
+        timestamp: { type: 'string', format: 'date-time' },
+        path: { type: 'string' },
+      },
+    },
+  })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   async logout(@Request() req) {
     await this.jwtAuthService.revokeAllUserRefreshTokens(req.user.id);
@@ -205,23 +289,32 @@ export class AuthController {
     description: 'User information retrieved',
     schema: {
       properties: {
-        id: { type: 'string' },
-        email: { type: 'string', nullable: true },
-        username: { type: 'string', nullable: true },
-        isActive: { type: 'boolean' },
-        createdAt: { type: 'string', format: 'date-time' },
-        wallets: {
-          type: 'array',
-          items: {
-            type: 'object',
-            properties: {
-              id: { type: 'string' },
-              publicKey: { type: 'string' },
-              isPrimary: { type: 'boolean' },
-              lastUsed: { type: 'string', format: 'date-time' },
+        success: { type: 'boolean', example: true },
+        statusCode: { type: 'number', example: 200 },
+        data: {
+          type: 'object',
+          properties: {
+            id: { type: 'string' },
+            email: { type: 'string', nullable: true },
+            username: { type: 'string', nullable: true },
+            isActive: { type: 'boolean' },
+            createdAt: { type: 'string', format: 'date-time' },
+            wallets: {
+              type: 'array',
+              items: {
+                type: 'object',
+                properties: {
+                  id: { type: 'string' },
+                  publicKey: { type: 'string' },
+                  isPrimary: { type: 'boolean' },
+                  lastUsed: { type: 'string', format: 'date-time' },
+                },
+              },
             },
           },
         },
+        timestamp: { type: 'string', format: 'date-time' },
+        path: { type: 'string' },
       },
     },
   })
@@ -236,7 +329,20 @@ export class AuthController {
   @ApiOperation({ summary: 'Bind additional wallet to account' })
   @ApiBody({ type: BindWalletDto })
   @ApiResponse({ status: 201, description: 'Wallet bound successfully' })
-  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({
+    status: 401,
+    description: 'Invalid signature',
+    schema: {
+      properties: {
+        success: { type: 'boolean', example: false },
+        statusCode: { type: 'number', example: 401 },
+        errorCode: { type: 'string', example: 'INVALID_SIGNATURE' },
+        message: { type: 'string', example: 'Invalid wallet signature' },
+        timestamp: { type: 'string', format: 'date-time' },
+        path: { type: 'string' },
+      },
+    },
+  })
   @ApiResponse({ status: 409, description: 'Wallet already bound' })
   async bindWallet(@Request() req, @Body() dto: BindWalletDto) {
     // Validate nonce
@@ -253,7 +359,7 @@ export class AuthController {
     );
 
     if (!isValid) {
-      throw new Error('Invalid signature');
+      throw new InvalidSignatureError('Invalid wallet signature');
     }
 
     // Mark nonce as used
@@ -283,7 +389,20 @@ export class AuthController {
   @ApiOperation({ summary: 'Unbind wallet from account' })
   @ApiBody({ type: UnbindWalletDto })
   @ApiResponse({ status: 200, description: 'Wallet unbound successfully' })
-  @ApiResponse({ status: 400, description: 'Cannot unbind the only wallet' })
+  @ApiResponse({
+    status: 400,
+    description: 'Cannot unbind the only wallet',
+    schema: {
+      properties: {
+        success: { type: 'boolean', example: false },
+        statusCode: { type: 'number', example: 400 },
+        errorCode: { type: 'string', example: 'WALLET_LAST_BOUND' },
+        message: { type: 'string', example: 'Cannot unbind the only wallet' },
+        timestamp: { type: 'string', format: 'date-time' },
+        path: { type: 'string' },
+      },
+    },
+  })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   async unbindWallet(@Request() req, @Body() dto: UnbindWalletDto) {
     await this.walletService.unbindWallet(dto.publicKey, req.user.id);
@@ -300,11 +419,21 @@ export class AuthController {
     description: 'API token created successfully (token shown only once)',
     schema: {
       properties: {
-        token: { type: 'string' },
-        id: { type: 'string' },
-        name: { type: 'string' },
-        role: { type: 'string' },
-        expiresAt: { type: 'string', format: 'date-time', nullable: true },
+        success: { type: 'boolean', example: true },
+        statusCode: { type: 'number', example: 201 },
+        data: {
+          type: 'object',
+          properties: {
+            token: { type: 'string' },
+            id: { type: 'string' },
+            name: { type: 'string' },
+            role: { type: 'string' },
+            expiresAt: { type: 'string', format: 'date-time', nullable: true },
+            warning: { type: 'string' },
+          },
+        },
+        timestamp: { type: 'string', format: 'date-time' },
+        path: { type: 'string' },
       },
     },
   })
@@ -335,18 +464,26 @@ export class AuthController {
     status: 200,
     description: 'API tokens retrieved',
     schema: {
-      type: 'array',
-      items: {
-        type: 'object',
-        properties: {
-          id: { type: 'string' },
-          name: { type: 'string' },
-          role: { type: 'string' },
-          expiresAt: { type: 'string', format: 'date-time', nullable: true },
-          revoked: { type: 'boolean' },
-          lastUsedAt: { type: 'string', format: 'date-time', nullable: true },
-          createdAt: { type: 'string', format: 'date-time' },
+      properties: {
+        success: { type: 'boolean', example: true },
+        statusCode: { type: 'number', example: 200 },
+        data: {
+          type: 'array',
+          items: {
+            type: 'object',
+            properties: {
+              id: { type: 'string' },
+              name: { type: 'string' },
+              role: { type: 'string' },
+              expiresAt: { type: 'string', format: 'date-time', nullable: true },
+              revoked: { type: 'boolean' },
+              lastUsedAt: { type: 'string', format: 'date-time', nullable: true },
+              createdAt: { type: 'string', format: 'date-time' },
+            },
+          },
         },
+        timestamp: { type: 'string', format: 'date-time' },
+        path: { type: 'string' },
       },
     },
   })
@@ -362,7 +499,20 @@ export class AuthController {
   @ApiOperation({ summary: 'Revoke API token' })
   @ApiResponse({ status: 200, description: 'API token revoked successfully' })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
-  @ApiResponse({ status: 404, description: 'API token not found' })
+  @ApiResponse({
+    status: 404,
+    description: 'API token not found',
+    schema: {
+      properties: {
+        success: { type: 'boolean', example: false },
+        statusCode: { type: 'number', example: 404 },
+        errorCode: { type: 'string', example: 'NOT_FOUND' },
+        message: { type: 'string', example: 'API token not found' },
+        timestamp: { type: 'string', format: 'date-time' },
+        path: { type: 'string' },
+      },
+    },
+  })
   async revokeApiToken(@Request() req, @Param('id') tokenId: string) {
     await this.apiTokenService.revokeApiToken(tokenId, req.user.id);
     return { message: 'API token revoked successfully' };

@@ -11,7 +11,7 @@ fn create_token(
     env: &Env,
     admin: &Address,
 ) -> (Address, TokenClient<'static>, StellarAssetClient<'static>) {
-    let address = env.register_stellar_asset_contract(admin.clone());
+    let address = env.register_stellar_asset_contract_v2(admin.clone()).address();
     (
         address.clone(),
         TokenClient::new(env, &address),
@@ -32,7 +32,7 @@ fn test_staking_workflow() {
     let (reward_token_address, reward_token, reward_token_admin) = create_token(&env, &admin);
 
     // Register contract
-    let contract_id = env.register_contract(None, StakingRewardsContract);
+    let contract_id = env.register(StakingRewardsContract, ());
     let client = StakingRewardsContractClient::new(&env, &contract_id);
 
     // Initialize
@@ -51,13 +51,13 @@ fn test_staking_workflow() {
     // Jump time: 15 days (1/2 of 30 days)
     env.ledger().set(soroban_sdk::testutils::LedgerInfo {
         timestamp: 15 * 24 * 60 * 60,
-        protocol_version: 20,
+        protocol_version: 26,
         sequence_number: 10,
         network_id: [0u8; 32],
         base_reserve: 10,
-        max_entry_ttl: 31104000,
-        min_persistent_entry_ttl: 31104000,
-        min_temp_entry_ttl: 31104000,
+        max_entry_ttl: 6_312_000,
+        min_persistent_entry_ttl: 4096,
+        min_temp_entry_ttl: 16,
     });
 
     // Check pending rewards
@@ -69,13 +69,13 @@ fn test_staking_workflow() {
     // Jump to 31 days (Expired lockup)
     env.ledger().set(soroban_sdk::testutils::LedgerInfo {
         timestamp: 31 * 24 * 60 * 60,
-        protocol_version: 20,
+        protocol_version: 26,
         sequence_number: 20,
         network_id: [0u8; 32],
         base_reserve: 10,
-        max_entry_ttl: 31104000,
-        min_persistent_entry_ttl: 31104000,
-        min_temp_entry_ttl: 31104000,
+        max_entry_ttl: 6_312_000,
+        min_persistent_entry_ttl: 4096,
+        min_temp_entry_ttl: 16,
     });
 
     // Claim rewards
@@ -100,7 +100,7 @@ fn test_early_withdrawal_penalty() {
     let (staking_token_address, _staking_token, staking_token_admin) = create_token(&env, &admin);
     let (reward_token_address, _reward_token, _reward_token_admin) = create_token(&env, &admin);
 
-    let contract_id = env.register_contract(None, StakingRewardsContract);
+    let contract_id = env.register(StakingRewardsContract, ());
     let client = StakingRewardsContractClient::new(&env, &contract_id);
 
     client.initialize(&admin, &staking_token_address, &reward_token_address);
@@ -111,13 +111,13 @@ fn test_early_withdrawal_penalty() {
     // Jump 1 day (Early)
     env.ledger().set(soroban_sdk::testutils::LedgerInfo {
         timestamp: 1 * 24 * 60 * 60,
-        protocol_version: 20,
+        protocol_version: 26,
         sequence_number: 10,
         network_id: [0u8; 32],
         base_reserve: 10,
-        max_entry_ttl: 31104000,
-        min_persistent_entry_ttl: 31104000,
-        min_temp_entry_ttl: 31104000,
+        max_entry_ttl: 6_312_000,
+        min_persistent_entry_ttl: 4096,
+        min_temp_entry_ttl: 16,
     });
 
     // Unstake early (10% penalty)
@@ -136,7 +136,7 @@ fn test_early_unstake_pays_pending_rewards() {
     let (staking_token_address, staking_token, staking_token_admin) = create_token(&env, &admin);
     let (reward_token_address, reward_token, reward_token_admin) = create_token(&env, &admin);
 
-    let contract_id = env.register_contract(None, StakingRewardsContract);
+    let contract_id = env.register(StakingRewardsContract, ());
     let client = StakingRewardsContractClient::new(&env, &contract_id);
 
     client.initialize(&admin, &staking_token_address, &reward_token_address);
@@ -149,13 +149,13 @@ fn test_early_unstake_pays_pending_rewards() {
     // Jump 15 days — inside the 30-day lockup, but rewards have accrued
     env.ledger().set(soroban_sdk::testutils::LedgerInfo {
         timestamp: 15 * 24 * 60 * 60,
-        protocol_version: 20,
+        protocol_version: 26,
         sequence_number: 10,
         network_id: [0u8; 32],
         base_reserve: 10,
-        max_entry_ttl: 31104000,
-        min_persistent_entry_ttl: 31104000,
-        min_temp_entry_ttl: 31104000,
+        max_entry_ttl: 6_312_000,
+        min_persistent_entry_ttl: 4096,
+        min_temp_entry_ttl: 16,
     });
 
     let pending = client.get_pending_rewards(&user);
@@ -180,7 +180,7 @@ fn test_compounding() {
     // In compounding test, staking token and reward token MUST be the same
     let (token_address, token, token_admin) = create_token(&env, &admin);
 
-    let contract_id = env.register_contract(None, StakingRewardsContract);
+    let contract_id = env.register(StakingRewardsContract, ());
     let client = StakingRewardsContractClient::new(&env, &contract_id);
 
     client.initialize(&admin, &token_address, &token_address);
@@ -191,13 +191,13 @@ fn test_compounding() {
     // Jump 180 days (half year)
     env.ledger().set(soroban_sdk::testutils::LedgerInfo {
         timestamp: 180 * 24 * 60 * 60,
-        protocol_version: 20,
+        protocol_version: 26,
         sequence_number: 10,
         network_id: [0u8; 32],
         base_reserve: 10,
-        max_entry_ttl: 31104000,
-        min_persistent_entry_ttl: 31104000,
-        min_temp_entry_ttl: 31104000,
+        max_entry_ttl: 6_312_000,
+        min_persistent_entry_ttl: 4096,
+        min_temp_entry_ttl: 16,
     });
 
     // Pending: 1000 * 0.15 * (180 / 365) = 150 * 0.493... = 73.97 -> 73
@@ -224,7 +224,7 @@ fn test_overflow_protection_in_reward_calculation() {
     let (staking_token_address, _staking_token, staking_token_admin) = create_token(&env, &admin);
     let (reward_token_address, _reward_token, _reward_token_admin) = create_token(&env, &admin);
 
-    let contract_id = env.register_contract(None, StakingRewardsContract);
+    let contract_id = env.register(StakingRewardsContract, ());
     let client = StakingRewardsContractClient::new(&env, &contract_id);
 
     client.initialize(&admin, &staking_token_address, &reward_token_address);
@@ -240,13 +240,13 @@ fn test_overflow_protection_in_reward_calculation() {
     // Advance one year
     env.ledger().set(soroban_sdk::testutils::LedgerInfo {
         timestamp: 365 * 24 * 60 * 60,
-        protocol_version: 20,
+        protocol_version: 26,
         sequence_number: 10,
         network_id: [0u8; 32],
         base_reserve: 10,
-        max_entry_ttl: 31104000,
-        min_persistent_entry_ttl: 31104000,
-        min_temp_entry_ttl: 31104000,
+        max_entry_ttl: 6_312_000,
+        min_persistent_entry_ttl: 4096,
+        min_temp_entry_ttl: 16,
     });
 
     // Claiming should panic (ArithmeticOverflow) because the numerator exceeds i128::MAX
@@ -265,7 +265,7 @@ fn test_overflow_protection_on_early_withdrawal_penalty() {
     let (staking_token_address, _staking_token, staking_token_admin) = create_token(&env, &admin);
     let (reward_token_address, _reward_token, _reward_token_admin) = create_token(&env, &admin);
 
-    let contract_id = env.register_contract(None, StakingRewardsContract);
+    let contract_id = env.register(StakingRewardsContract, ());
     let client = StakingRewardsContractClient::new(&env, &contract_id);
 
     client.initialize(&admin, &staking_token_address, &reward_token_address);

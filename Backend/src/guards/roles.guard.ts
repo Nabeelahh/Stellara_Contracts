@@ -1,13 +1,22 @@
-import {
-  CanActivate,
-  ExecutionContext,
-  ForbiddenException,
-  Injectable,
-} from '@nestjs/common';
+import { CanActivate, ExecutionContext, Injectable } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { ROLES_KEY } from '../decorators/roles.decorator';
 import { Role } from '../auth/roles.enum';
+import {
+  ForbiddenError,
+  InsufficientRoleError,
+} from '../common/exceptions/api-error.exception';
 
+/**
+ * Guard that enforces role-based access control (RBAC) on routes decorated
+ * with `@Roles(Role.ADMIN)` (or similar).
+ *
+ * Throws typed `ApiError` sub-classes so the `HttpExceptionFilter` can
+ * render the standard error envelope:
+ *
+ * - No user / no role attached to the request → `ForbiddenError` (403, FORBIDDEN)
+ * - User role not in the required list        → `InsufficientRoleError` (403, INSUFFICIENT_ROLE)
+ */
 @Injectable()
 export class RolesGuard implements CanActivate {
   constructor(private readonly reflector: Reflector) {}
@@ -26,11 +35,11 @@ export class RolesGuard implements CanActivate {
     const user = request.user;
 
     if (!user || !user.role) {
-      throw new ForbiddenException('User role not found');
+      throw new ForbiddenError('User role not found');
     }
 
     if (!requiredRoles.includes(user.role)) {
-      throw new ForbiddenException('Insufficient permissions');
+      throw new InsufficientRoleError(requiredRoles, user.role);
     }
 
     return true;

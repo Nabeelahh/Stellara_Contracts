@@ -1,6 +1,6 @@
-import { Module } from '@nestjs/common';
+import { Module, OnModuleInit } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
-import { BullModule } from '@nestjs/bull';
+import { BullModule, InjectQueue } from '@nestjs/bull';
 import { VoiceGateway } from './voice.gateway';
 import { VoiceSessionService } from './services/voice-session.service';
 import { ConversationStateMachineService } from './services/conversation-state-machine.service';
@@ -15,10 +15,15 @@ import { AiUsageQuota } from '../ai/quota/quota.entity';
 import { JwtService } from '@nestjs/jwt';
 import { WsJwtAuthGuard } from '../auth/guards/ws-jwt-auth.guard';
 import { RedisModule } from '../redis/redis.module';
+import { ObservabilityModule } from '../observability/observability.module';
+import { QueueJobTracingWrapper } from '../observability/middleware/queue-job-tracing.wrapper';
+import type { Queue } from 'bull';
+import { VoiceProcessor } from './voice.processor';
 
 @Module({
   imports: [
     RedisModule,
+    ObservabilityModule,
     TypeOrmModule.forFeature([VoiceSession, VoiceJob, AiUsageQuota]),
     BullModule.registerQueue({
       name: 'voice-processing',
@@ -35,6 +40,7 @@ import { RedisModule } from '../redis/redis.module';
     LlmCacheService,
     JwtService,
     WsJwtAuthGuard,
+    VoiceProcessor,
   ],
   exports: [
     VoiceSessionService,
@@ -45,4 +51,13 @@ import { RedisModule } from '../redis/redis.module';
     LlmCacheService,
   ],
 })
-export class VoiceModule {}
+export class VoiceModule implements OnModuleInit {
+  constructor(
+    private readonly queueJobTracingWrapper: QueueJobTracingWrapper,
+    @InjectQueue('voice-processing') private readonly voiceProcessingQueue: Queue,
+  ) {}
+
+  async onModuleInit() {
+    this.queueJobTracingWrapper.wrapQueueMetrics(this.voiceProcessingQueue, 'voice-processing');
+  }
+}

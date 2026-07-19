@@ -7,6 +7,8 @@ import { ThrottleGuard } from './throttle/throttle.guard';
 import { ConfigValidationService } from './config/config-validation.service';
 import { SecretsMaskingService } from './config/secrets-masking.service';
 import { SecretsRotationService } from './config/secrets-rotation.service';
+import { HttpExceptionFilter } from './common/filters/http-exception.filter';
+import { ResponseEnvelopeInterceptor } from './common/interceptors/response-envelope.interceptor';
 
 const REQUIRED_ENV_VARS = ['JWT_SECRET', 'DB_HOST', 'REDIS_URL'] as const;
 
@@ -89,6 +91,15 @@ async function bootstrap() {
       transform: true,
     }),
   );
+
+  // ── Error handling & response shaping ───────────────────────────────────
+  // HttpExceptionFilter converts any exception (ApiError or plain HttpException)
+  // into the standard error envelope: { success, statusCode, errorCode, message, ... }.
+  app.useGlobalFilters(new HttpExceptionFilter());
+
+  // ResponseEnvelopeInterceptor wraps every successful response in:
+  // { success: true, statusCode, data, timestamp, path }
+  app.useGlobalInterceptors(new ResponseEnvelopeInterceptor());
 
   const config = new DocumentBuilder()
     .setTitle('Stellara API')
