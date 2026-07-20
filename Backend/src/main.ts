@@ -9,6 +9,7 @@ import { SecretsMaskingService } from './config/secrets-masking.service';
 import { SecretsRotationService } from './config/secrets-rotation.service';
 import { HttpExceptionFilter } from './common/filters/http-exception.filter';
 import { ResponseEnvelopeInterceptor } from './common/interceptors/response-envelope.interceptor';
+import { CorrelationMiddleware } from './observability/middleware/correlation.middleware';
 
 const REQUIRED_ENV_VARS = ['JWT_SECRET', 'DB_HOST', 'REDIS_URL'] as const;
 

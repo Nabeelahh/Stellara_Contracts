@@ -7,8 +7,10 @@ import { TraceContext } from '../types/trace-context.interface';
 
 /**
  * WebSocket Tracing Adapter
- * Manages trace context for WebSocket connections and messages
- * Records metrics for WebSocket events
+ * Manages trace context for WebSocket connections and messages.
+ * Propagates the correlation ID (X-Request-ID) across the WebSocket layer
+ * so that a request that starts as HTTP can continue through WS events
+ * with the same identifier.
  */
 @Injectable()
 export class WebSocketTracingAdapter {
@@ -24,25 +26,31 @@ export class WebSocketTracingAdapter {
    * Initialize tracing for WebSocket connection
    */
   initializeConnection(socket: Socket, namespace: string): TraceContext {
-    // Extract trace context from handshake query/headers
     const handshakeHeaders = socket.handshake.headers;
     const traceContext = this.tracingService.extractTraceContext(
       handshakeHeaders as Record<string, string>,
     );
 
-    // Store trace context for this socket
+    // Reuse existing correlation ID or generate a new one
+    const correlationId =
+      (socket.handshake.query?.correlationId as string) ||
+      (socket.handshake.query?.['x-request-id'] as string) ||
+      (handshakeHeaders['x-request-id'] as string) ||
+      this.metricsService.generateCorrelationId();
+
+    this.tracingService.addMetadata(traceContext.traceId, { correlationId });
+
     this.socketTraceMap.set(socket.id, traceContext);
 
-    // Attach trace context to socket
     (socket as any).traceContext = traceContext;
+    (socket as any).correlationId = correlationId;
 
-    // Record metrics
-    this.metricsService.recordWebSocketConnection(namespace);
+    this.metricsService.recordWebSocketConnection(namespace, correlationId);
 
-    // Log connection
     this.loggingService.info('WebSocket connection established', {
       traceId: traceContext.traceId,
       spanId: traceContext.spanId,
+      correlationId,
       socketId: socket.id,
       namespace,
       userId: traceContext.userId,
@@ -60,20 +68,25 @@ export class WebSocketTracingAdapter {
     const traceContext = this.socketTraceMap.get(socketId);
 
     if (traceContext) {
-      // Record metrics
-      this.metricsService.recordWebSocketDisconnection(namespace, reason);
+      const correlationId =
+        (traceContext.metadata?.['correlationId'] as string) || '';
 
-      // Log disconnection
+      this.metricsService.recordWebSocketDisconnection(
+        namespace,
+        reason,
+        correlationId,
+      );
+
       this.loggingService.info('WebSocket connection closed', {
         traceId: traceContext.traceId,
         spanId: traceContext.spanId,
+        correlationId,
         socketId,
         namespace,
         reason,
         userId: traceContext.userId,
       });
 
-      // Clean up
       this.socketTraceMap.delete(socketId);
     }
   }
@@ -90,13 +103,19 @@ export class WebSocketTracingAdapter {
     const traceContext = this.socketTraceMap.get(socketId);
 
     if (traceContext) {
-      // Record metrics
-      this.metricsService.recordWebSocketMessage(namespace, eventType);
+      const correlationId =
+        (traceContext.metadata?.['correlationId'] as string) || '';
 
-      // Log message
+      this.metricsService.recordWebSocketMessage(
+        namespace,
+        eventType,
+        correlationId,
+      );
+
       this.loggingService.debug('WebSocket message', {
         traceId: traceContext.traceId,
         spanId: traceContext.spanId,
+        correlationId,
         socketId,
         namespace,
         eventType,
