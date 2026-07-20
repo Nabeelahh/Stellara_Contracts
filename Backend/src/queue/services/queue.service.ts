@@ -1,10 +1,11 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { InjectQueue } from '@nestjs/bull';
 import type { Queue, Job } from 'bull';
-import { JobData, JobResult, JobStatus, JobInfo } from '../types/job.types';
+import { JobData, JobResult, JobStatus, JobInfo, RetryState } from '../types/job.types';
 import { RedisService } from '../../redis/redis.service';
 import { QueueJobTracingWrapper } from '../../observability/middleware/queue-job-tracing.wrapper';
 import { TraceContext } from '../../observability/types/trace-context.interface';
+import { QueueIdempotencyGuard } from '../queue-idempotency.guard';
 
 @Injectable()
 export class QueueService {
@@ -12,6 +13,7 @@ export class QueueService {
 
   // DLQ key prefix in Redis
   private readonly DLQ_PREFIX = 'queue:dlq:';
+  private readonly RETRY_STATE_PREFIX = 'queue:retry:';
 
   constructor(
     @InjectQueue('deploy-contract') private deployContractQueue: Queue,
@@ -19,6 +21,7 @@ export class QueueService {
     @InjectQueue('index-market-news') private indexMarketNewsQueue: Queue,
     private readonly redisService: RedisService,
     private readonly queueJobTracingWrapper: QueueJobTracingWrapper,
+    private readonly idempotencyGuard: QueueIdempotencyGuard,
   ) {
     this.initializeQueues();
   }
@@ -58,7 +61,8 @@ export class QueueService {
   }
 
   /**
-   * Add a job to the queue
+   * Add a job to the queue with idempotency checking.
+   * Returns null if the job is a duplicate (already queued or completed).
    */
   async addJob<T extends JobData>(
     queueName: string,
@@ -66,8 +70,24 @@ export class QueueService {
     data: T,
     options: any = {},
     parentTraceContext?: TraceContext,
-  ): Promise<Job<T>> {
+  ): Promise<Job<T> | null> {
     const queue = this.getQueueByName(queueName);
+
+    // Check idempotency unless explicitly bypassed
+    if (!options.skipIdempotencyCheck) {
+      const idempotencyKey = this.idempotencyGuard.generateIdempotencyKey(
+        `${queueName}:${jobName}`,
+        data as Record<string, any>,
+      );
+
+      const isDuplicate = await this.idempotencyGuard.isDuplicate(idempotencyKey);
+      if (isDuplicate.isDuplicate) {
+        this.logger.warn(
+          `Duplicate job rejected: ${jobName} on ${queueName} (existing job: ${isDuplicate.jobId})`,
+        );
+        return null;
+      }
+    }
 
     // Inject trace context if parentTraceContext is provided
     let jobData = data;
@@ -81,12 +101,36 @@ export class QueueService {
       ...options,
     });
 
+    // Atomically claim the idempotency slot after successful add
+    if (!options.skipIdempotencyCheck) {
+      const idempotencyKey = this.idempotencyGuard.generateIdempotencyKey(
+        `${queueName}:${jobName}`,
+        data as Record<string, any>,
+      );
+      await this.idempotencyGuard.acquireIdempotencyKey(idempotencyKey, job.id);
+    }
+
+    // Initialize retry state
+    await this.saveRetryState({
+      jobId: job.id.toString(),
+      queueName,
+      jobName,
+      attemptCount: 0,
+      maxAttempts: options.attempts || 3,
+      firstAttemptedAt: new Date().toISOString(),
+      lastAttemptedAt: new Date().toISOString(),
+      idempotencyKey: this.idempotencyGuard.generateIdempotencyKey(
+        `${queueName}:${jobName}`,
+        data as Record<string, any>,
+      ),
+    });
+
     this.logger.log(`Job added: ${jobName} with ID: ${job.id}`);
     return job;
   }
 
   /**
-   * Get job status and info
+   * Get job status and info, including retry state.
    */
   async getJobInfo(
     queueName: string,
@@ -101,6 +145,7 @@ export class QueueService {
 
     const state = await job.getState();
     const progress = job.progress();
+    const retryState = await this.getRetryState(job.id.toString()) || undefined;
 
     return {
       id: job.id.toString(),
@@ -117,6 +162,7 @@ export class QueueService {
       createdAt: new Date(job.timestamp),
       processedAt: job.processedOn ? new Date(job.processedOn) : undefined,
       completedAt: job.finishedOn ? new Date(job.finishedOn) : undefined,
+      retryState,
     };
   }
 
@@ -289,7 +335,39 @@ export class QueueService {
   }
 
   /**
-   * Handle job failure - move to DLQ if max retries exceeded
+   * Save or update retry state for a job in Redis.
+   */
+  async saveRetryState(state: RetryState): Promise<void> {
+    const key = `${this.RETRY_STATE_PREFIX}${state.jobId}`;
+    try {
+      await this.redisService.client.set(key, JSON.stringify(state), {
+        EX: 86400, // 24h TTL
+      });
+    } catch (error) {
+      this.logger.error(
+        `Failed to save retry state for job ${state.jobId}: ${error.message}`,
+      );
+    }
+  }
+
+  /**
+   * Get retry state for a job.
+   */
+  async getRetryState(jobId: string): Promise<RetryState | null> {
+    const key = `${this.RETRY_STATE_PREFIX}${jobId}`;
+    try {
+      const data = await this.redisService.client.get(key);
+      return data ? JSON.parse(data) : null;
+    } catch (error) {
+      this.logger.error(
+        `Failed to get retry state for job ${jobId}: ${error.message}`,
+      );
+      return null;
+    }
+  }
+
+  /**
+   * Handle job failure - update retry state and move to DLQ if max retries exceeded.
    */
   private async handleJobFailure(job: Job, error: Error): Promise<void> {
     const maxAttempts = job.opts.attempts || 1;
@@ -299,7 +377,18 @@ export class QueueService {
       `Job ${job.id} (${job.name}) failed: ${error.message} (attempt ${attempts}/${maxAttempts})`,
     );
 
-    // If max retries exceeded, move to DLQ
+    // Update retry state
+    const retryState = await this.getRetryState(job.id.toString());
+    if (retryState) {
+      retryState.attemptCount = attempts;
+      retryState.lastError = error.message;
+      retryState.lastErrorStack = error.stack;
+      retryState.lastAttemptedAt = new Date().toISOString();
+      retryState.maxAttempts = maxAttempts;
+      await this.saveRetryState(retryState);
+    }
+
+    // If max retries exceeded, move to DLQ with retry state
     if (attempts >= maxAttempts) {
       const dlqKey = `${this.DLQ_PREFIX}${job.queue.name}`;
       const dlqItem = JSON.stringify({
@@ -310,6 +399,7 @@ export class QueueService {
         attempts: attempts,
         maxAttempts: maxAttempts,
         failedAt: new Date().toISOString(),
+        retryState: retryState || null,
       });
 
       try {
@@ -319,6 +409,12 @@ export class QueueService {
         );
       } catch (dlqError) {
         this.logger.error(`Failed to move job to DLQ: ${dlqError.message}`);
+      }
+
+      // Mark completion in retry state
+      if (retryState) {
+        retryState.completedAt = new Date().toISOString();
+        await this.saveRetryState(retryState);
       }
     }
   }

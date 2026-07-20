@@ -42,7 +42,7 @@ export class QueueExampleService {
         },
       );
 
-      this.logger.log(`Contract deployment job queued: ${job.id}`);
+      this.logger.log(`Contract deployment job queued: ${job!.id}`);
       return job;
     } catch (error) {
       this.logger.error(
@@ -83,7 +83,7 @@ export class QueueExampleService {
         },
       );
 
-      this.logger.log(`TTS processing job queued: ${job.id}`);
+      this.logger.log(`TTS processing job queued: ${job!.id}`);
       return job;
     } catch (error) {
       this.logger.error(`Failed to queue TTS processing: ${error.message}`);
@@ -120,7 +120,7 @@ export class QueueExampleService {
         },
       );
 
-      this.logger.log(`Market news indexing job queued: ${job.id}`);
+      this.logger.log(`Market news indexing job queued: ${job!.id}`);
       return job;
     } catch (error) {
       this.logger.error(
