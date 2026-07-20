@@ -41,4 +41,24 @@ export interface JobInfo {
   createdAt: Date;
   processedAt?: Date;
   completedAt?: Date;
+  retryState?: RetryState;
+}
+
+export interface RetryState {
+  jobId: string;
+  queueName: string;
+  jobName: string;
+  attemptCount: number;
+  maxAttempts: number;
+  lastError?: string;
+  lastErrorStack?: string;
+  firstAttemptedAt: string;
+  lastAttemptedAt: string;
+  completedAt?: string;
+  idempotencyKey: string;
+}
+
+export interface IdempotencyResult {
+  isDuplicate: boolean;
+  jobId?: string | number;
 }

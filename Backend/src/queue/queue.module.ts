@@ -2,6 +2,7 @@ import { Module, OnModuleInit, Inject } from '@nestjs/common';
 import { BullModule, InjectQueue, getQueueToken } from '@nestjs/bull';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { QueueService } from './services/queue.service';
+import { QueueIdempotencyGuard } from './queue-idempotency.guard';
 import { DeployContractProcessor } from './processors/deploy-contract.processor';
 import { ProcessTtsProcessor } from './processors/process-tts.processor';
 import { IndexMarketNewsProcessor } from './processors/index-market-news.processor';
@@ -45,12 +46,13 @@ import type { Queue } from 'bull';
   controllers: [QueueAdminController],
   providers: [
     QueueService,
+    QueueIdempotencyGuard,
     DeployContractProcessor,
     ProcessTtsProcessor,
     IndexMarketNewsProcessor,
     DeadLetterProcessor,
   ],
-  exports: [QueueService],
+  exports: [QueueService, QueueIdempotencyGuard],
 })
 export class QueueModule implements OnModuleInit {
   constructor(

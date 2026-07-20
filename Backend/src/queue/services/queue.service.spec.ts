@@ -2,6 +2,8 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { getQueueToken } from '@nestjs/bull';
 import { QueueService } from './queue.service';
 import { RedisService } from '../../redis/redis.service';
+import { QueueJobTracingWrapper } from '../../observability/middleware/queue-job-tracing.wrapper';
+import { QueueIdempotencyGuard } from '../queue-idempotency.guard';
 import { JobStatus } from '../types/job.types';
 
 describe('QueueService', () => {
@@ -40,6 +42,9 @@ describe('QueueService', () => {
         lRange: jest.fn(),
         rPush: jest.fn(),
         lTrim: jest.fn(),
+        set: jest.fn().mockResolvedValue('OK'),
+        get: jest.fn().mockResolvedValue(null),
+        del: jest.fn().mockResolvedValue(1),
       },
     };
 
@@ -52,6 +57,14 @@ describe('QueueService', () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         QueueService,
+        QueueIdempotencyGuard,
+        {
+          provide: QueueJobTracingWrapper,
+          useValue: {
+            injectTraceContext: jest.fn().mockImplementation((_data: any) => _data),
+            wrapProcessor: jest.fn().mockImplementation((fn: any) => fn),
+          },
+        },
         {
           provide: getQueueToken('deploy-contract'),
           useValue: mockQueue,
