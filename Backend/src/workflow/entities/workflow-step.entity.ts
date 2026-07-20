@@ -43,6 +43,9 @@ export class WorkflowStep {
   @Column('jsonb', { nullable: true })
   config?: Record<string, any>;
 
+  @Column('jsonb', { nullable: true })
+  resumableState?: Record<string, any>;
+
   @Column({ default: 0 })
   retryCount: number;
 

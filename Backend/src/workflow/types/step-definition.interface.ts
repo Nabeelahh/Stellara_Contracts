@@ -21,4 +21,6 @@ export interface WorkflowContext {
   retryCount: number;
   stepIndex: number;
   metadata?: Record<string, any>;
+  resumableState?: Record<string, any>;
+  updateState?: (state: Record<string, any>) => Promise<void>;
 }

@@ -39,15 +39,28 @@ export class WorkflowExecutionService {
    * Register a workflow definition
    */
   registerWorkflowDefinition(definition: WorkflowDefinition): void {
-    this.workflowDefinitions.set(definition.type, definition);
-    this.logger.log(`Registered workflow definition: ${definition.type}`);
+    const version = definition.version || 1;
+    const key = `${definition.type}:v${version}`;
+    this.workflowDefinitions.set(key, definition);
+    
+    // Track the latest version
+    const latestKey = `${definition.type}:latest`;
+    const currentLatest = this.workflowDefinitions.get(latestKey);
+    if (!currentLatest || (currentLatest.version || 1) <= version) {
+      this.workflowDefinitions.set(latestKey, definition);
+    }
+    
+    this.logger.log(`Registered workflow definition: ${definition.type} v${version}`);
   }
 
   /**
-   * Get workflow definition by type
+   * Get workflow definition by type and optional version
    */
-  getWorkflowDefinition(type: string): WorkflowDefinition | undefined {
-    return this.workflowDefinitions.get(type);
+  getWorkflowDefinition(type: string, version?: number): WorkflowDefinition | undefined {
+    if (version !== undefined) {
+      return this.workflowDefinitions.get(`${type}:v${version}`);
+    }
+    return this.workflowDefinitions.get(`${type}:latest`);
   }
 
   /**
@@ -64,6 +77,7 @@ export class WorkflowExecutionService {
     if (!definition) {
       throw new Error(`Workflow definition not found for type: ${type}`);
     }
+    const version = definition.version || 1;
 
     // Generate idempotency key
     const idempotencyKey =
@@ -115,6 +129,8 @@ export class WorkflowExecutionService {
       const workflow = this.workflowRepository.create({
         idempotencyKey,
         type: type as any,
+        version,
+        definition: this.serializeDefinition(definition),
         input,
         userId,
         walletAddress,
@@ -159,10 +175,10 @@ export class WorkflowExecutionService {
    * Execute a workflow
    */
   async executeWorkflow(workflow: Workflow): Promise<void> {
-    const definition = this.getWorkflowDefinition(workflow.type);
+    const definition = this.getWorkflowDefinition(workflow.type, workflow.version);
     if (!definition) {
       throw new Error(
-        `Workflow definition not found for type: ${workflow.type}`,
+        `Workflow definition not found for type: ${workflow.type} v${workflow.version}`,
       );
     }
 
@@ -272,6 +288,11 @@ export class WorkflowExecutionService {
         retryCount: step.retryCount,
         stepIndex: step.stepIndex,
         metadata: workflow.context,
+        resumableState: step.resumableState,
+        updateState: async (state: Record<string, any>) => {
+          step.resumableState = { ...step.resumableState, ...state };
+          await this.stepRepository.save(step);
+        },
       };
 
       // Prepare step input
@@ -587,5 +608,17 @@ export class WorkflowExecutionService {
     }
 
     return null;
+  }
+
+  /**
+   * Serialize workflow definition (removes functions)
+   */
+  private serializeDefinition(definition: WorkflowDefinition): Record<string, any> {
+    const serialized = { ...definition };
+    serialized.steps = serialized.steps.map(step => {
+      const { execute, compensate, ...rest } = step;
+      return rest as any;
+    });
+    return serialized as Record<string, any>;
   }
 }

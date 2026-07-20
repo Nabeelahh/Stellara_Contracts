@@ -23,6 +23,15 @@ export class Workflow {
   @Column({ unique: true })
   idempotencyKey: string;
 
+  @Column({ default: 1 })
+  version: number;
+
+  @Column('jsonb', { nullable: true })
+  definition?: Record<string, any>;
+
+  @Column('jsonb', { nullable: true })
+  recoveryMetadata?: Record<string, any>;
+
   @Column({
     type: 'enum',
     enum: WorkflowType,
