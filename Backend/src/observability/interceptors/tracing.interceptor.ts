@@ -13,8 +13,9 @@ import { MetricsService } from '../services/metrics.service';
 
 /**
  * HTTP Tracing Interceptor
- * Extracts/creates trace IDs, measures request duration, and logs errors
- * Propagates trace context to downstream services
+ * Extracts/creates trace IDs, measures request duration, and logs errors.
+ * Correlates every request through the `X-Request-ID` / correlation ID that
+ * is set by the upstream CorrelationMiddleware.
  */
 @Injectable()
 export class TracingInterceptor implements NestInterceptor {
@@ -28,13 +29,24 @@ export class TracingInterceptor implements NestInterceptor {
     const request = context.switchToHttp().getRequest<Request>();
     const response = context.switchToHttp().getResponse<Response>();
 
+    // Use the correlation ID already attached by CorrelationMiddleware, or
+    // extract one from the incoming headers via the tracing service.
+    const correlationId: string =
+      (request as any).correlationId ||
+      (request.headers['x-request-id'] as string) ||
+      this.metricsService.generateCorrelationId();
+
     // Extract or create trace context
     const traceContext = this.tracingService.extractTraceContext(
       request.headers as Record<string, string>,
     );
 
-    // Attach trace context to request for downstream access
+    // Attach both trace context and correlation ID to the request
     (request as any).traceContext = traceContext;
+    (request as any).correlationId = correlationId;
+
+    // Propagate correlation ID through the trace context metadata
+    this.tracingService.addMetadata(traceContext.traceId, { correlationId });
 
     // Set response headers with trace ID
     const traceHeaders = this.tracingService.injectTraceContext(traceContext);
@@ -42,13 +54,13 @@ export class TracingInterceptor implements NestInterceptor {
       response.setHeader(key, value);
     });
 
-    // Log request start
     const startTime = Date.now();
     const requestSize = this.getRequestSize(request);
 
     this.loggingService.info('HTTP request received', {
       traceId: traceContext.traceId,
       spanId: traceContext.spanId,
+      correlationId,
       method: request.method,
       path: request.path,
       url: request.url,
@@ -59,10 +71,9 @@ export class TracingInterceptor implements NestInterceptor {
 
     return next.handle().pipe(
       tap((responseData) => {
-        const duration = (Date.now() - startTime) / 1000; // Convert to seconds
+        const duration = (Date.now() - startTime) / 1000;
         const responseSize = this.getResponseSize(responseData);
 
-        // Record metrics
         const statusCode = response.statusCode;
         const route = this.getRouteLabel(request);
 
@@ -71,14 +82,15 @@ export class TracingInterceptor implements NestInterceptor {
           route,
           statusCode,
           duration,
+          correlationId,
           requestSize,
           responseSize,
         );
 
-        // Log request completion
         this.loggingService.info('HTTP request completed', {
           traceId: traceContext.traceId,
           spanId: traceContext.spanId,
+          correlationId,
           method: request.method,
           path: request.path,
           statusCode,
@@ -92,17 +104,17 @@ export class TracingInterceptor implements NestInterceptor {
         const duration = (Date.now() - startTime) / 1000;
         const route = this.getRouteLabel(request);
 
-        // Record error metrics
         this.metricsService.recordHttpError(
           request.method,
           route,
           error.name || 'UnknownError',
+          correlationId,
         );
 
-        // Log error
         this.loggingService.error('HTTP request error', error, {
           traceId: traceContext.traceId,
           spanId: traceContext.spanId,
+          correlationId,
           method: request.method,
           path: request.path,
           statusCode: response.statusCode,
@@ -116,17 +128,11 @@ export class TracingInterceptor implements NestInterceptor {
     );
   }
 
-  /**
-   * Get request size in bytes
-   */
   private getRequestSize(request: Request): number {
     const contentLength = request.get('content-length');
     return contentLength ? parseInt(contentLength) : 0;
   }
 
-  /**
-   * Get response size in bytes (estimate)
-   */
   private getResponseSize(data: any): number {
     if (!data) return 0;
     if (typeof data === 'string') return Buffer.byteLength(data);
@@ -137,9 +143,6 @@ export class TracingInterceptor implements NestInterceptor {
     }
   }
 
-  /**
-   * Get client IP address
-   */
   private getClientIp(request: Request): string {
     return (
       (request.get('x-forwarded-for') as string)?.split(',')[0] ||
@@ -148,9 +151,6 @@ export class TracingInterceptor implements NestInterceptor {
     );
   }
 
-  /**
-   * Get route label (e.g., GET /api/users/:id)
-   */
   private getRouteLabel(request: Request): string {
     const route = (request as any).route?.path || request.path;
     return `${request.method} ${route}`;

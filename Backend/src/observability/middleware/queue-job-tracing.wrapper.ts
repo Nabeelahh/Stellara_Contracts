@@ -7,8 +7,8 @@ import { TraceContext } from '../types/trace-context.interface';
 
 /**
  * Queue Job Tracing Wrapper
- * Propagates trace context through Bull queue jobs
- * Records metrics for job execution
+ * Propagates trace context + correlation ID through Bull queue jobs
+ * and records metrics for job execution.
  */
 @Injectable()
 export class QueueJobTracingWrapper {
@@ -29,61 +29,63 @@ export class QueueJobTracingWrapper {
   ): (job: Job<T>) => Promise<any> {
     return async (job: Job<T>): Promise<any> => {
       const traceContext = this.createJobTraceContext(job, jobName);
+      const correlationId =
+        (traceContext.metadata?.['correlationId'] as string) ||
+        this.metricsService.generateCorrelationId();
       const startTime = Date.now();
 
       try {
-        // Record job start
-        this.metricsService.recordJobStart(jobName);
+        this.metricsService.recordJobStart(jobName, correlationId);
 
-        // Log job start
         this.loggingService.info('Job processing started', {
           traceId: traceContext.traceId,
           spanId: traceContext.spanId,
+          correlationId,
           jobId: job.id,
           jobName,
           jobData: this.sanitizeJobData(job.data),
         });
 
-        // Execute the actual processor
         const result = await processor(job);
 
-        const duration = (Date.now() - startTime) / 1000; // Convert to seconds
+        const duration = (Date.now() - startTime) / 1000;
 
-        // Record job completion
-        this.metricsService.recordJobCompleted(jobName, duration);
+        this.metricsService.recordJobCompleted(jobName, duration, correlationId);
 
-        // Log job completion
         this.loggingService.info('Job processing completed', {
           traceId: traceContext.traceId,
           spanId: traceContext.spanId,
+          correlationId,
           jobId: job.id,
           jobName,
           duration,
           result: this.sanitizeJobData(result),
         });
 
-        // Clean up
         this.jobTraceMap.delete(job.id.toString());
 
         return result;
       } catch (error) {
         const duration = (Date.now() - startTime) / 1000;
 
-        // Record job failure
         const errorType = error?.name || 'UnknownError';
-        this.metricsService.recordJobFailed(jobName, duration, errorType);
+        this.metricsService.recordJobFailed(
+          jobName,
+          duration,
+          errorType,
+          correlationId,
+        );
 
-        // Log job failure
         this.loggingService.error('Job processing failed', error, {
           traceId: traceContext.traceId,
           spanId: traceContext.spanId,
+          correlationId,
           jobId: job.id,
           jobName,
           duration,
           jobData: this.sanitizeJobData(job.data),
         });
 
-        // Clean up
         this.jobTraceMap.delete(job.id.toString());
 
         throw error;
@@ -92,10 +94,9 @@ export class QueueJobTracingWrapper {
   }
 
   /**
-   * Create trace context for job
+   * Create trace context for job, preserving any existing correlation ID.
    */
   private createJobTraceContext(job: Job, jobName: string): TraceContext {
-    // Try to extract trace context from job data
     let traceContext: TraceContext;
 
     if (
@@ -104,14 +105,13 @@ export class QueueJobTracingWrapper {
       'traceContext' in job.data &&
       job.data.traceContext
     ) {
-      // Use existing trace context from job data
       traceContext = this.tracingService.createTraceContext(
         job.data.traceContext.traceId,
         job.data.traceContext.spanId,
         job.data.traceContext.userId,
+        { jobName, jobId: job.id, correlationId: job.data.correlationId },
       );
     } else {
-      // Create new trace context for background job
       traceContext = this.tracingService.createTraceContext(
         undefined,
         undefined,
@@ -125,7 +125,7 @@ export class QueueJobTracingWrapper {
   }
 
   /**
-   * Inject trace context into job data
+   * Inject trace context into job data for cross-service propagation.
    */
   injectTraceContext(data: any, parentTraceContext: TraceContext): any {
     return {
@@ -135,6 +135,7 @@ export class QueueJobTracingWrapper {
         spanId: parentTraceContext.spanId,
         userId: parentTraceContext.userId,
       },
+      correlationId: parentTraceContext.metadata?.['correlationId'] || undefined,
     };
   }
 
@@ -142,31 +143,16 @@ export class QueueJobTracingWrapper {
    * Wrap queue initialization with metrics tracking
    */
   wrapQueueMetrics(queue: Queue, queueName: string) {
-    // Track job added to queue
-    queue.on('waiting', () => {
+    const updateSize = () =>
       queue.count().then((count) => {
         this.metricsService.updateJobQueueSize(queueName, count);
       });
-    });
 
-    // Track job completion
-    queue.on('completed', () => {
-      queue.count().then((count) => {
-        this.metricsService.updateJobQueueSize(queueName, count);
-      });
-    });
+    queue.on('waiting', updateSize);
+    queue.on('completed', updateSize);
+    queue.on('failed', updateSize);
 
-    // Track job failure
-    queue.on('failed', () => {
-      queue.count().then((count) => {
-        this.metricsService.updateJobQueueSize(queueName, count);
-      });
-    });
-
-    // Initial size
-    queue.count().then((count) => {
-      this.metricsService.updateJobQueueSize(queueName, count);
-    });
+    updateSize();
   }
 
   /**
