@@ -1,9 +1,10 @@
-import { Injectable, UnauthorizedException } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, LessThan } from 'typeorm';
+import { Injectable } from '@nestjs/common';
+import { InjectRepository, InjectDataSource } from '@nestjs/typeorm';
+import { DataSource, LessThan, Repository } from 'typeorm';
 import { LoginNonce } from '../entities/login-nonce.entity';
 import { randomUUID as uuidv4 } from 'crypto';
 import { Cron, CronExpression } from '@nestjs/schedule';
+import { InvalidNonceError } from '../../common/exceptions/api-error.exception';
 
 @Injectable()
 export class NonceService {
@@ -12,6 +13,8 @@ export class NonceService {
   constructor(
     @InjectRepository(LoginNonce)
     private readonly nonceRepository: Repository<LoginNonce>,
+    @InjectDataSource()
+    private readonly dataSource: DataSource,
   ) {}
 
   async generateNonce(
@@ -41,26 +44,66 @@ export class NonceService {
     };
   }
 
+  /**
+   * Atomically verify a nonce and consume it in a single transaction.
+   *
+   * Returning the row via `update ... returning` means a second concurrent
+   * login with the same nonce fails the `used = false` predicate instead of
+   * silently succeeding, closing the replay window. Any validation failure
+   * (not found / already used / expired) throws before the nonce is touched,
+   * so a failed signature check never leaves a consumed-but-unauthenticated
+   * nonce behind.
+   */
   async validateNonce(nonce: string, publicKey: string): Promise<LoginNonce> {
-    const loginNonce = await this.nonceRepository.findOne({
-      where: { nonce, publicKey },
+    if (!nonce || !publicKey) {
+      throw new InvalidNonceError('Nonce and public key are required');
+    }
+
+    return this.dataSource.transaction(async (manager) => {
+      const repo = manager.getRepository(LoginNonce);
+
+      const loginNonce = await repo.findOne({
+        where: { nonce, publicKey },
+      });
+
+      if (!loginNonce) {
+        throw new InvalidNonceError('Invalid nonce');
+      }
+
+      if (loginNonce.used) {
+        throw new InvalidNonceError('Nonce already used');
+      }
+
+      if (new Date() > loginNonce.expiresAt) {
+        throw new InvalidNonceError('Nonce expired');
+      }
+
+      const updateResult = await repo
+        .createQueryBuilder()
+        .update(LoginNonce)
+        .set({ used: true })
+        .where('nonce = :nonce AND publicKey = :publicKey AND used = false', {
+          nonce,
+          publicKey,
+        })
+        .returning('*')
+        .execute();
+
+      const consumed = (updateResult.raw as unknown[] | undefined)?.[0] as
+        | LoginNonce
+        | undefined;
+      if (!consumed) {
+        throw new InvalidNonceError('Nonce already used');
+      }
+
+      return repo.create(consumed);
     });
-
-    if (!loginNonce) {
-      throw new UnauthorizedException('Invalid nonce');
-    }
-
-    if (loginNonce.used) {
-      throw new UnauthorizedException('Nonce already used');
-    }
-
-    if (new Date() > loginNonce.expiresAt) {
-      throw new UnauthorizedException('Nonce expired');
-    }
-
-    return loginNonce;
   }
 
+  /**
+   * @deprecated Prefer `validateNonce`, which consumes the nonce atomically.
+   * Retained for callers that need to mark a nonce used out-of-band.
+   */
   async markNonceUsed(nonce: string): Promise<void> {
     await this.nonceRepository.update({ nonce }, { used: true });
   }
