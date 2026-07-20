@@ -278,3 +278,112 @@ fn test_overflow_protection_on_early_withdrawal_penalty() {
     // Penalty calc: i128::MAX * 1_000 overflows i128 → should panic (ArithmeticOverflow).
     client.unstake(&user);
 }
+
+#[test]
+fn test_parameter_proposal_and_execution() {
+    let env = Env::default();
+    env.mock_all_auths();
+
+    let admin = Address::generate(&env);
+
+    let (staking_token_address, _staking_token, _staking_token_admin) = create_token(&env, &admin);
+    let (reward_token_address, _reward_token, _reward_token_admin) = create_token(&env, &admin);
+
+    let contract_id = env.register(StakingRewardsContract, ());
+    let client = StakingRewardsContractClient::new(&env, &contract_id);
+
+    client.initialize(&admin, &staking_token_address, &reward_token_address);
+
+    // Propose parameter change
+    let parameter_key = symbol_short!("p_cfg");
+    let new_value = 1000u128;
+
+    let proposal_id = client.propose_parameter_change(&admin, &parameter_key, &new_value);
+
+    // Verify proposal was created
+    let proposal = client.get_parameter_proposal(&proposal_id);
+    assert_eq!(proposal.parameter_key, parameter_key);
+    assert_eq!(proposal.new_value, new_value);
+    assert_eq!(proposal.executed, false);
+    assert_eq!(proposal.cancelled, false);
+
+    // Try to execute before timelock (should fail)
+    let result = client.try_execute_parameter_change(&admin, &proposal_id);
+    assert!(result.is_err());
+
+    // Advance time past timelock
+    env.ledger().set(soroban_sdk::testutils::LedgerInfo {
+        timestamp: env.ledger().timestamp() + 86401,
+        protocol_version: 26,
+        sequence_number: 20,
+        network_id: [0u8; 32],
+        base_reserve: 10,
+        max_entry_ttl: 6_312_000,
+        min_persistent_entry_ttl: 4096,
+        min_temp_entry_ttl: 16,
+    });
+
+    // Execute parameter change
+    client.execute_parameter_change(&admin, &proposal_id);
+
+    // Verify proposal is executed
+    let proposal = client.get_parameter_proposal(&proposal_id);
+    assert_eq!(proposal.executed, true);
+}
+
+#[test]
+fn test_parameter_proposal_cancellation() {
+    let env = Env::default();
+    env.mock_all_auths();
+
+    let admin = Address::generate(&env);
+
+    let (staking_token_address, _staking_token, _staking_token_admin) = create_token(&env, &admin);
+    let (reward_token_address, _reward_token, _reward_token_admin) = create_token(&env, &admin);
+
+    let contract_id = env.register(StakingRewardsContract, ());
+    let client = StakingRewardsContractClient::new(&env, &contract_id);
+
+    client.initialize(&admin, &staking_token_address, &reward_token_address);
+
+    // Propose parameter change
+    let parameter_key = symbol_short!("p_cfg");
+    let new_value = 1000u128;
+
+    let proposal_id = client.propose_parameter_change(&admin, &parameter_key, &new_value);
+
+    // Cancel proposal
+    client.cancel_parameter_proposal(&admin, &proposal_id);
+
+    // Verify proposal is cancelled
+    let proposal = client.get_parameter_proposal(&proposal_id);
+    assert_eq!(proposal.cancelled, true);
+
+    // Try to execute cancelled proposal (should fail)
+    let result = client.try_execute_parameter_change(&admin, &proposal_id);
+    assert!(result.is_err());
+}
+
+#[test]
+fn test_parameter_proposal_unauthorized() {
+    let env = Env::default();
+    env.mock_all_auths();
+
+    let admin = Address::generate(&env);
+    let unauthorized = Address::generate(&env);
+
+    let (staking_token_address, _staking_token, _staking_token_admin) = create_token(&env, &admin);
+    let (reward_token_address, _reward_token, _reward_token_admin) = create_token(&env, &admin);
+
+    let contract_id = env.register(StakingRewardsContract, ());
+    let client = StakingRewardsContractClient::new(&env, &contract_id);
+
+    client.initialize(&admin, &staking_token_address, &reward_token_address);
+
+    let parameter_key = symbol_short!("p_cfg");
+    let new_value = 1000u128;
+
+    // Try to propose parameter change with unauthorized address
+    let result = client.try_propose_parameter_change(&unauthorized, &parameter_key, &new_value);
+    assert_eq!(result, Err(Ok(ContractError::Unauthorized)));
+}

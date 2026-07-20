@@ -331,6 +331,114 @@ mod tests {
     }
 
     #[test]
+    fn test_parameter_proposal_and_execution() {
+        let env = create_test_env();
+        let contract_id = env.register_contract(None, StablecoinReserveContract);
+        let client = StablecoinReserveContractClient::new(&env, &contract_id);
+
+        let (admin, approver1, approver2, executor) = create_test_addresses(&env);
+        let stablecoin_address = Address::generate(&env);
+        let approvers = vec![&env, approver1.clone(), approver2.clone()];
+
+        client.initialize(&admin, &approvers, &executor, &stablecoin_address);
+
+        // Propose parameter change
+        let parameter_key = symbol_short!("rebal_thresh");
+        let new_value = 750u128; // 7.5%
+
+        let proposal_id = client.propose_parameter_change(&admin, &parameter_key, &new_value);
+        assert!(proposal_id.is_ok());
+
+        let proposal_id = proposal_id.unwrap();
+
+        // Verify proposal was created
+        let proposal = client.get_parameter_proposal(&proposal_id);
+        assert!(proposal.is_ok());
+
+        let proposal = proposal.unwrap();
+        assert_eq!(proposal.parameter_key, parameter_key);
+        assert_eq!(proposal.new_value, new_value);
+        assert_eq!(proposal.executed, false);
+        assert_eq!(proposal.cancelled, false);
+
+        // Try to execute before timelock (should fail)
+        let result = client.try_execute_parameter_change(&executor, &proposal_id);
+        assert!(result.is_err());
+
+        // Advance time past timelock
+        env.ledger().set(soroban_sdk::testutils::LedgerInfo {
+            timestamp: env.ledger().timestamp() + 86401,
+            protocol_version: 26,
+            sequence_number: 20,
+            network_id: [0u8; 32],
+            base_reserve: 10,
+            max_entry_ttl: 6_312_000,
+            min_persistent_entry_ttl: 4096,
+            min_temp_entry_ttl: 16,
+        });
+
+        // Execute parameter change
+        let result = client.execute_parameter_change(&executor, &proposal_id);
+        assert!(result.is_ok());
+
+        // Verify proposal is executed
+        let proposal = client.get_parameter_proposal(&proposal_id).unwrap();
+        assert_eq!(proposal.executed, true);
+    }
+
+    #[test]
+    fn test_parameter_proposal_cancellation() {
+        let env = create_test_env();
+        let contract_id = env.register_contract(None, StablecoinReserveContract);
+        let client = StablecoinReserveContractClient::new(&env, &contract_id);
+
+        let (admin, approver1, approver2, executor) = create_test_addresses(&env);
+        let stablecoin_address = Address::generate(&env);
+        let approvers = vec![&env, approver1.clone(), approver2.clone()];
+
+        client.initialize(&admin, &approvers, &executor, &stablecoin_address);
+
+        // Propose parameter change
+        let parameter_key = symbol_short!("rebal_thresh");
+        let new_value = 750u128;
+
+        let proposal_id = client.propose_parameter_change(&admin, &parameter_key, &new_value).unwrap();
+
+        // Cancel proposal
+        let result = client.cancel_parameter_proposal(&admin, &proposal_id);
+        assert!(result.is_ok());
+
+        // Verify proposal is cancelled
+        let proposal = client.get_parameter_proposal(&proposal_id).unwrap();
+        assert_eq!(proposal.cancelled, true);
+
+        // Try to execute cancelled proposal (should fail)
+        let result = client.try_execute_parameter_change(&executor, &proposal_id);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_parameter_proposal_unauthorized() {
+        let env = create_test_env();
+        let contract_id = env.register_contract(None, StablecoinReserveContract);
+        let client = StablecoinReserveContractClient::new(&env, &contract_id);
+
+        let (admin, approver1, approver2, executor) = create_test_addresses(&env);
+        let stablecoin_address = Address::generate(&env);
+        let approvers = vec![&env, approver1.clone(), approver2.clone()];
+
+        client.initialize(&admin, &approvers, &executor, &stablecoin_address);
+
+        let unauthorized = Address::generate(&env);
+        let parameter_key = symbol_short!("rebal_thresh");
+        let new_value = 750u128;
+
+        // Try to propose parameter change with unauthorized address
+        let result = client.try_propose_parameter_change(&unauthorized, &parameter_key, &new_value);
+        assert_eq!(result, Err(Ok(ReserveError::Unauthorized)));
+    }
+
+    #[test]
     fn test_comprehensive_workflow() {
         let env = create_test_env();
         let contract_id = env.register_contract(None, StablecoinReserveContract);
