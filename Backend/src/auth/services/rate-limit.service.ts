@@ -1,80 +1,81 @@
-import { Injectable } from '@nestjs/common';
-import { RedisService } from '../../redis/redis.service';
+import { Injectable, Logger, InternalServerErrorException } from '@nestjs/common';
+import { Redis } from 'ioredis';
+
+export interface RateLimitResult {
+  allowed: boolean;
+  remaining: number;
+  resetAt: Date;
+}
 
 @Injectable()
 export class RateLimitService {
-  constructor(private readonly redisService: RedisService) {}
+  private readonly logger = new Logger(RateLimitService.name);
+  
+  // Refactored Lua script to return an array containing: [allowed_status, remaining_count, ttl_seconds]
+  private readonly rateLimitLuaScript = `
+    local key = KEYS[1]
+    local limit = tonumber(ARGV[1])
+    local window = tonumber(ARGV[2])
 
-  async checkRateLimit(
-    key: string,
-    limit: number,
-    windowSeconds: number,
-  ): Promise<{ allowed: boolean; remaining: number; resetAt: Date }> {
-    const redisKey = `rate_limit:${key}`;
-    const now = Date.now();
-    const windowStart = now - windowSeconds * 1000;
+    local current = redis.call('get', key)
+    if current and tonumber(current) >= limit then
+        local ttl = redis.call('ttl', key)
+        return {0, 0, ttl}
+    else
+        current = redis.call('incr', key)
+        if tonumber(current) == 1 then
+            redis.call('expire', key, window)
+        end
+        local ttl = redis.call('ttl', key)
+        if ttl < 0 then ttl = window end
+        return {1, limit - tonumber(current), ttl}
+    end
+  `;
+
+  constructor(private readonly redisClient: Redis) {}
+
+  /**
+   * Helper utility to keep uniform key structuring strategies across guards
+   */
+  generateKeyForIp(ip: string, prefix: string): string {
+    return `rate_limit:${prefix}:${ip}`;
+  }
+
+  /**
+   * Evaluates an execution cadence atomically with strict fail-closed fallbacks.
+   */
+  async checkRateLimit(ip: string, route: string, limit = 5, windowInSeconds = 60): Promise<RateLimitResult> {
+    const cacheKey = this.generateKeyForIp(ip, route);
 
     try {
-      const redis = this.redisService.client;
+      // Execute evaluation and parse array responses: [allowed, remaining, ttl]
+      const [allowed, remaining, ttl] = await this.redisClient.eval(
+        this.rateLimitLuaScript,
+        1,
+        cacheKey,
+        limit.toString(),
+        windowInSeconds.toString()
+      ) as [number, number, number];
 
-      // Remove old entries outside the window
-      await redis.zRemRangeByScore(redisKey, 0, windowStart);
+      return {
+        allowed: allowed === 1,
+        remaining: remaining,
+        resetAt: new Date(Date.now() + (ttl > 0 ? ttl : windowInSeconds) * 1000),
+      };
+    } catch (redisError) {
+      this.logger.error(`Redis operational failure on key [${cacheKey}]:`, redisError);
 
-      // Count requests in current window
-      const requestCount = await redis.zCard(redisKey);
-
-      if (requestCount >= limit) {
-        // Rate limit exceeded
-        const oldestEntry = await redis.zRange(redisKey, 0, 0, { REV: false });
-        const resetTime =
-          oldestEntry.length > 0
-            ? parseInt(oldestEntry[0]) + windowSeconds * 1000
-            : now + windowSeconds * 1000;
-
-        return {
-          allowed: false,
-          remaining: 0,
-          resetAt: new Date(resetTime),
-        };
+      if (route.includes('/auth') || route.includes('/login') || route.includes('/register')) {
+        this.logger.warn(`Fail-Closed policy blocking traffic to sensitive target: ${route}`);
+        throw new InternalServerErrorException('Security validation failure.');
       }
 
-      // Add current request
-      await redis.zAdd(redisKey, { score: now, value: `${now}` });
-
-      // Set expiration on the key
-      await redis.expire(redisKey, windowSeconds);
-
+      // Fail Open for non-sensitive public routes
       return {
         allowed: true,
-        remaining: limit - requestCount - 1,
-        resetAt: new Date(now + windowSeconds * 1000),
-      };
-    } catch (error) {
-      console.error('Rate limit check error:', error);
-      // On Redis error, allow the request (fail open)
-      return {
-        allowed: true,
-        remaining: limit,
-        resetAt: new Date(now + windowSeconds * 1000),
+        remaining: 1,
+        resetAt: new Date(Date.now() + windowInSeconds * 1000),
       };
     }
-  }
-
-  async resetRateLimit(key: string): Promise<void> {
-    const redisKey = `rate_limit:${key}`;
-    try {
-      const redis = this.redisService.client;
-      await redis.del(redisKey);
-    } catch (error) {
-      console.error('Rate limit reset error:', error);
-    }
-  }
-
-  generateKeyForIp(ip: string, endpoint: string): string {
-    return `ip:${ip}:${endpoint}`;
-  }
-
-  generateKeyForUser(userId: string, endpoint: string): string {
-    return `user:${userId}:${endpoint}`;
   }
 }
