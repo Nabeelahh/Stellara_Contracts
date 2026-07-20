@@ -2,11 +2,10 @@ import {
   Injectable,
   CanActivate,
   ExecutionContext,
-  HttpException,
-  HttpStatus,
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { RateLimitService } from '../services/rate-limit.service';
+import { RateLimitError } from '../../common/exceptions/api-error.exception';
 
 export const RATE_LIMIT_KEY = 'rate_limit';
 
@@ -71,14 +70,7 @@ export class RateLimitGuard implements CanActivate {
     response.setHeader('X-RateLimit-Reset', result.resetAt.toISOString());
 
     if (!result.allowed) {
-      throw new HttpException(
-        {
-          statusCode: HttpStatus.TOO_MANY_REQUESTS,
-          message: 'Too many requests',
-          retryAfter: result.resetAt.toISOString(),
-        },
-        HttpStatus.TOO_MANY_REQUESTS,
-      );
+      throw new RateLimitError(result.resetAt);
     }
 
     return true;

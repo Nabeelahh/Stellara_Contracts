@@ -4,11 +4,14 @@ import {
   Column,
   ManyToOne,
   CreateDateColumn,
+  Index,
   JoinColumn,
 } from 'typeorm';
 import { User } from './user.entity';
 
 @Entity('refresh_tokens')
+@Index(['userId', 'revoked'])
+@Index(['familyId'])
 export class RefreshToken {
   @PrimaryGeneratedColumn('uuid')
   id: string;
@@ -31,6 +34,20 @@ export class RefreshToken {
 
   @Column({ type: 'timestamp', nullable: true })
   revokedAt?: Date;
+
+  @Column({ type: 'timestamp', nullable: true })
+  replacedAt?: Date;
+
+  /**
+   * Tokens issued from a single login session (or chained refreshes) share a
+   * family. When any token in a family is reused after being rotated, the
+   * whole family is revoked to stop replay attacks.
+   */
+  @Column({ type: 'varchar', nullable: true })
+  familyId?: string | null;
+
+  @Column({ type: 'varchar', nullable: true })
+  replacedByToken?: string | null;
 
   @CreateDateColumn({ type: 'timestamp' })
   createdAt: Date;

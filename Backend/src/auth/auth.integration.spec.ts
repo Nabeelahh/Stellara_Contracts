@@ -25,7 +25,7 @@ describe('Auth Integration Tests (e2e)', () => {
           envFilePath: '.env.test',
         }),
         TypeOrmModule.forRoot({
-          type: 'sqlite',
+          type: 'better-sqlite3',
           database: ':memory:',
           entities: [__dirname + '/**/*.entity{.ts,.js}'],
           synchronize: true,
@@ -163,7 +163,7 @@ describe('Auth Integration Tests (e2e)', () => {
   });
 
   describe('Invalid Signature', () => {
-    it('should reject invalid signature', async () => {
+    it('should reject invalid signature with structured error', async () => {
       const nonceResponse = await request(app.getHttpServer())
         .post('/auth/nonce')
         .send({ publicKey: testKeypair.publicKey() });
@@ -171,14 +171,65 @@ describe('Auth Integration Tests (e2e)', () => {
       const nonce = nonceResponse.body.nonce;
       const invalidSignature = 'invalid-signature-base64';
 
-      await request(app.getHttpServer())
+      const res = await request(app.getHttpServer())
         .post('/auth/wallet/login')
         .send({
           publicKey: testKeypair.publicKey(),
           signature: invalidSignature,
           nonce,
         })
-        .expect(500);
+        .expect(401);
+
+      expect(res.body).toHaveProperty('errorCode', 'INVALID_SIGNATURE');
+    });
+  });
+
+  describe('Refresh Token Rotation & Abuse', () => {
+    it('should revoke the whole family when a rotated token is replayed', async () => {
+      // Login to obtain a refresh token
+      const nonceResponse = await request(app.getHttpServer())
+        .post('/auth/nonce')
+        .send({ publicKey: testKeypair.publicKey() });
+
+      const nonce = nonceResponse.body.nonce;
+      const message = `Sign this message to authenticate with Stellara: ${nonce}`;
+      const signature = nacl.sign.detached(
+        Buffer.from(message, 'utf-8'),
+        testKeypair.rawSecretKey(),
+      );
+
+      const loginResponse = await request(app.getHttpServer())
+        .post('/auth/wallet/login')
+        .send({
+          publicKey: testKeypair.publicKey(),
+          signature: Buffer.from(signature).toString('base64'),
+          nonce,
+        })
+        .expect(200);
+
+      const firstRefresh = loginResponse.body.refreshToken;
+
+      // Rotate once → first token is now revoked
+      const rotateResponse = await request(app.getHttpServer())
+        .post('/auth/refresh')
+        .send({ refreshToken: firstRefresh })
+        .expect(200);
+
+      expect(rotateResponse.body.refreshToken).not.toBe(firstRefresh);
+
+      // Replaying the rotated-away token must fail and revoke the family
+      const replay = await request(app.getHttpServer())
+        .post('/auth/refresh')
+        .send({ refreshToken: firstRefresh })
+        .expect(401);
+
+      expect(replay.body).toHaveProperty('errorCode', 'TOKEN_INVALID');
+
+      // The freshly issued token from the legitimate rotation is also dead
+      await request(app.getHttpServer())
+        .post('/auth/refresh')
+        .send({ refreshToken: rotateResponse.body.refreshToken })
+        .expect(401);
     });
   });
 

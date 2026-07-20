@@ -17,6 +17,8 @@ import {
   ApiBearerAuth,
   ApiBody,
 } from '@nestjs/swagger';
+import { InjectDataSource } from '@nestjs/typeorm';
+import { DataSource } from 'typeorm';
 import { NonceService } from '../services/nonce.service';
 import { WalletService } from '../services/wallet.service';
 import { JwtAuthService } from '../services/jwt-auth.service';
@@ -33,9 +35,9 @@ import { ConfigService } from '@nestjs/config';
 import { AuditService } from '../../audit/audit.service';
 import {
   InvalidSignatureError,
-  NotFoundError,
   ApiErrorCode,
 } from '../../common/exceptions/api-error.exception';
+import { randomUUID as uuidv4 } from 'crypto';
 
 @ApiTags('Authentication')
 @Controller('auth')
@@ -48,6 +50,8 @@ export class AuthController {
     private readonly apiTokenService: ApiTokenService,
     private readonly configService: ConfigService,
     private readonly auditService: AuditService,
+    @InjectDataSource()
+    private readonly dataSource: DataSource,
   ) {}
 
   @Post('nonce')
@@ -89,7 +93,11 @@ export class AuthController {
     },
   })
   async requestNonce(@Body() dto: RequestNonceDto) {
-    return await this.nonceService.generateNonce(dto.publicKey);
+    const result = await this.nonceService.generateNonce(dto.publicKey);
+    await this.auditService.logAction('NONCE_ISSUED', 'anonymous', undefined, {
+      wallet: dto.publicKey,
+    });
+    return result;
   }
 
   @Post('wallet/login')
@@ -141,12 +149,6 @@ export class AuthController {
   })
   @ApiResponse({ status: 429, description: 'Too many requests' })
   async walletLogin(@Body() dto: WalletLoginDto) {
-    // Validate nonce
-    const nonceRecord = await this.nonceService.validateNonce(
-      dto.nonce,
-      dto.publicKey,
-    );
-
     // Construct message to verify
     const message = `Sign this message to authenticate with Stellara: ${dto.nonce}`;
 
@@ -158,11 +160,29 @@ export class AuthController {
     );
 
     if (!isValid) {
+      await this.auditService.logAction(
+        'WALLET_LOGIN_FAILED',
+        'unknown',
+        undefined,
+        { reason: 'invalid_signature', wallet: dto.publicKey },
+      );
       throw new InvalidSignatureError('Invalid wallet signature');
     }
 
-    // Mark nonce as used
-    await this.nonceService.markNonceUsed(dto.nonce);
+    // Validate + atomically consume the nonce. This both closes the replay
+    // window and ensures a consumed nonce is never left behind if a later
+    // step fails.
+    try {
+      await this.nonceService.validateNonce(dto.nonce, dto.publicKey);
+    } catch (error) {
+      await this.auditService.logAction(
+        'WALLET_LOGIN_FAILED',
+        'unknown',
+        undefined,
+        { reason: 'invalid_nonce', wallet: dto.publicKey },
+      );
+      throw error;
+    }
 
     // Find or create user
     let user = await this.walletService.findUserByWallet(dto.publicKey);
@@ -170,8 +190,18 @@ export class AuthController {
     let isNewUser = false;
 
     if (!user) {
-      user = await this.walletService.createUserWithWallet(dto.publicKey);
-      isNewUser = true;
+      try {
+        user = await this.walletService.createUserWithWallet(dto.publicKey);
+        isNewUser = true;
+      } catch (error) {
+        await this.auditService.logAction(
+          'WALLET_LOGIN_FAILED',
+          'unknown',
+          undefined,
+          { reason: 'user_creation_failed', wallet: dto.publicKey },
+        );
+        throw error;
+      }
     }
 
     if (isNewUser) {
@@ -183,11 +213,18 @@ export class AuthController {
     // Update wallet last used
     await this.walletService.updateLastUsed(dto.publicKey);
 
-    // Generate tokens
-    const accessToken = await this.jwtAuthService.generateAccessToken(user.id);
+    // Generate tokens (refresh token seeds a rotation family)
+    const accessToken = await this.jwtAuthService.generateAccessToken(
+      user.id,
+    );
     const refreshTokenData = await this.jwtAuthService.generateRefreshToken(
       user.id,
     );
+
+    await this.auditService.logAction('WALLET_LOGIN_SUCCESS', user.id, user.id, {
+      wallet: dto.publicKey,
+      isNewUser,
+    });
 
     return {
       accessToken,
@@ -248,6 +285,7 @@ export class AuthController {
     return {
       accessToken: tokens.accessToken,
       refreshToken: tokens.newRefreshToken,
+      familyId: tokens.familyId,
     };
   }
 
@@ -276,7 +314,15 @@ export class AuthController {
   })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   async logout(@Request() req) {
-    await this.jwtAuthService.revokeAllUserRefreshTokens(req.user.id);
+    await this.jwtAuthService.revokeAllUserRefreshTokens(
+      req.user.id,
+      'logout',
+    );
+    await this.auditService.logAction(
+      'WALLET_LOGOUT',
+      req.user.id,
+      req.user.id,
+    );
     return { message: 'Logged out successfully' };
   }
 
@@ -345,13 +391,10 @@ export class AuthController {
   })
   @ApiResponse({ status: 409, description: 'Wallet already bound' })
   async bindWallet(@Request() req, @Body() dto: BindWalletDto) {
-    // Validate nonce
-    await this.nonceService.validateNonce(dto.nonce, dto.publicKey);
-
     // Construct message to verify
     const message = `Sign this message to authenticate with Stellara: ${dto.nonce}`;
 
-    // Verify signature
+    // Verify signature first — if it's invalid there is no point consuming a nonce
     const isValid = await this.walletService.verifySignature(
       dto.publicKey,
       dto.signature,
@@ -359,18 +402,50 @@ export class AuthController {
     );
 
     if (!isValid) {
+      await this.auditService.logAction(
+        'WALLET_BIND_FAILED',
+        req.user.id,
+        req.user.id,
+        { reason: 'invalid_signature', wallet: dto.publicKey },
+      );
       throw new InvalidSignatureError('Invalid wallet signature');
     }
 
-    // Mark nonce as used
-    await this.nonceService.markNonceUsed(dto.nonce);
+    // Validate + atomically consume the nonce (closes the replay window).
+    try {
+      await this.nonceService.validateNonce(dto.nonce, dto.publicKey);
+    } catch (error) {
+      await this.auditService.logAction(
+        'WALLET_BIND_FAILED',
+        req.user.id,
+        req.user.id,
+        { reason: 'invalid_nonce', wallet: dto.publicKey },
+      );
+      throw error;
+    }
 
-    // Bind wallet
-    const binding = await this.walletService.bindWalletToUser(
-      dto.publicKey,
-      req.user.id,
-      false,
-    );
+    // Bind wallet. The nonce is already consumed, so a failure here leaves a
+    // consistent state (no half-bound wallet) rather than a consumed nonce.
+    let binding;
+    try {
+      binding = await this.walletService.bindWalletToUser(
+        dto.publicKey,
+        req.user.id,
+        false,
+      );
+    } catch (error) {
+      await this.auditService.logAction(
+        'WALLET_BIND_FAILED',
+        req.user.id,
+        req.user.id,
+        { reason: 'bind_failed', wallet: dto.publicKey },
+      );
+      throw error;
+    }
+
+    await this.auditService.logAction('WALLET_BOUND', req.user.id, binding.id, {
+      wallet: dto.publicKey,
+    });
 
     return {
       message: 'Wallet bound successfully',

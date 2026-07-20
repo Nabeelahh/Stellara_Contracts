@@ -77,32 +77,49 @@ export class ApiError extends HttpException {
 // ─── Convenience sub-classes ────────────────────────────────────────────────
 
 export class NotFoundError extends ApiError {
-  constructor(message = 'Resource not found', errorCode = ApiErrorCode.NOT_FOUND) {
+  constructor(
+    message = 'Resource not found',
+    errorCode = ApiErrorCode.NOT_FOUND,
+  ) {
     super(HttpStatus.NOT_FOUND, errorCode, message);
   }
 }
 
 export class ConflictError extends ApiError {
-  constructor(message = 'Resource already exists', errorCode = ApiErrorCode.CONFLICT) {
+  constructor(
+    message = 'Resource already exists',
+    errorCode = ApiErrorCode.CONFLICT,
+  ) {
     super(HttpStatus.CONFLICT, errorCode, message);
   }
 }
 
 export class UnauthorizedError extends ApiError {
-  constructor(message = 'Unauthorized', errorCode = ApiErrorCode.UNAUTHORIZED) {
+  constructor(
+    message = 'Unauthorized',
+    errorCode = ApiErrorCode.UNAUTHORIZED,
+  ) {
     super(HttpStatus.UNAUTHORIZED, errorCode, message);
   }
 }
 
 export class ForbiddenError extends ApiError {
-  constructor(message = 'Forbidden', errorCode = ApiErrorCode.FORBIDDEN) {
+  constructor(
+    message = 'Forbidden',
+    errorCode = ApiErrorCode.FORBIDDEN,
+  ) {
     super(HttpStatus.FORBIDDEN, errorCode, message);
   }
 }
 
 export class ValidationError extends ApiError {
   constructor(message = 'Validation failed', details?: unknown) {
-    super(HttpStatus.BAD_REQUEST, ApiErrorCode.VALIDATION_ERROR, message, details);
+    super(
+      HttpStatus.BAD_REQUEST,
+      ApiErrorCode.VALIDATION_ERROR,
+      message,
+      details,
+    );
   }
 }
 
@@ -118,9 +135,24 @@ export class InvalidNonceError extends ApiError {
   }
 }
 
+export class TokenInvalidError extends ApiError {
+  constructor(message = 'Invalid or expired token') {
+    super(HttpStatus.UNAUTHORIZED, ApiErrorCode.TOKEN_INVALID, message);
+  }
+}
+
+export class TokenExpiredError extends ApiError {
+  constructor(message = 'Token expired') {
+    super(HttpStatus.UNAUTHORIZED, ApiErrorCode.TOKEN_EXPIRED, message);
+  }
+}
+
 export class WorkflowNotFoundError extends NotFoundError {
   constructor(id?: string) {
-    super(id ? `Workflow '${id}' not found` : 'Workflow not found', ApiErrorCode.WORKFLOW_NOT_FOUND);
+    super(
+      id ? `Workflow '${id}' not found` : 'Workflow not found',
+      ApiErrorCode.WORKFLOW_NOT_FOUND,
+    );
   }
 }
 
@@ -132,7 +164,10 @@ export class WorkflowInvalidStateError extends ApiError {
 
 export class StepNotFoundError extends NotFoundError {
   constructor(id?: string) {
-    super(id ? `Step '${id}' not found` : 'Step not found', ApiErrorCode.STEP_NOT_FOUND);
+    super(
+      id ? `Step '${id}' not found` : 'Step not found',
+      ApiErrorCode.STEP_NOT_FOUND,
+    );
   }
 }
 
