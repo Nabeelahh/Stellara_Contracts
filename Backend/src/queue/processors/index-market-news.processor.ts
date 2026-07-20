@@ -42,12 +42,13 @@ export class IndexMarketNewsProcessor {
       async (jobToProcess: Job<IndexMarketNewsData>) => {
         const { source, startDate, endDate, limit = 100 } = jobToProcess.data;
         const start = Date.now();
+        const correlationId = jobToProcess.data?.correlationId || `index-market-news-${source}`;
 
         this.logger.log(
           `Processing index-market-news job ${jobToProcess.id}: source=${source}, limit=${limit}`,
         );
 
-        this.metrics?.recordJobStart('index-market-news');
+        this.metrics?.recordJobStart('index-market-news', correlationId);
 
         try {
           await jobToProcess.progress(10);
@@ -73,7 +74,7 @@ export class IndexMarketNewsProcessor {
           );
 
           const duration = (Date.now() - start) / 1000;
-          this.metrics?.recordJobCompleted('index-market-news', duration);
+          this.metrics?.recordJobCompleted('index-market-news', duration, correlationId);
 
           return {
             success: true,
@@ -87,7 +88,7 @@ export class IndexMarketNewsProcessor {
           };
         } catch (error) {
           const duration = (Date.now() - start) / 1000;
-          this.metrics?.recordJobFailed('index-market-news', duration, error.constructor.name);
+          this.metrics?.recordJobFailed('index-market-news', duration, error.constructor.name, correlationId);
           this.logger.error(
             `Failed to index market news: ${error.message}`,
             error.stack,
