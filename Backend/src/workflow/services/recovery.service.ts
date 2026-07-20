@@ -383,7 +383,7 @@ export class RecoveryService implements OnModuleInit {
               if (step && step.state === StepState.RUNNING) {
                 step.state = StepState.FAILED;
                 step.failedAt = new Date();
-                step.failureReason = \`Queue job failed in ${queueName}: \${jobData.error || 'Unknown error'}\`;
+                step.failureReason = `Queue job failed in ${queueName}: ${jobData.error || 'Unknown error'}`;
                 step.retryCount += 1;
 
                 if (this.stateMachine.shouldRetry(StepState.FAILED, step.retryCount, step.maxRetries)) {
@@ -392,7 +392,7 @@ export class RecoveryService implements OnModuleInit {
                 } else {
                   workflow.state = WorkflowState.FAILED;
                   workflow.failedAt = new Date();
-                  workflow.failureReason = \`Step ${step.stepName} failed after max queue retries\`;
+                  workflow.failureReason = `Step ${step.stepName} failed after max queue retries`;
                   await this.workflowRepository.save(workflow);
                 }
                 
