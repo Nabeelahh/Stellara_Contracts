@@ -14,6 +14,37 @@ Deployment and testing
 - Use `hardhat` or `foundry` to compile and deploy the Solidity contracts. Install `@openzeppelin/contracts`.
 - For circuits, compile with `circom` and use `snarkjs` for trusted setup and proof generation.
 
+### Credential Lifecycle Security (SoulboundCredential.sol)
+
+Credentials follow a strict lifecycle enforced by modifiers on every public entry point:
+
+```
+Issued ──► Active ──► Revoked / Expired
+                  │
+                  └──► Reissued (new token, old burned)
+```
+
+**Enforced invariants:**
+- **Revocation is immediate and irreversible** – once revoked, all `valid()` checks return false. Revoked tokens cannot be renewed; use `reissue()` to mint a replacement.
+- **Expiration is checked on every operation** – `renew()` rejects expired tokens. `valid()` returns false past expiry.
+- **Re-issuance cleanly handles old state** – `reissue()` burns the old token, clears its state, and mints a fresh credential. Works even when the old credential was revoked or expired.
+- **Transfers and approvals are always blocked** – all ERC-721 transfer/approval functions revert with explicit messages.
+
+**Events emitted by SoulboundCredential:**
+
+| Event | When |
+|---|---|
+| `CredentialIssued(to, tokenId, expiresAt)` | New credential minted |
+| `CredentialRevoked(tokenId)` | Credential revoked by issuer |
+| `CredentialExpired(tokenId)` | (logged on check) Past expiry detected |
+| `CredentialRenewed(tokenId, newExpiresAt)` | Expiration extended |
+| `CredentialReissued(to, tokenId, expiresAt)` | New credential replaces old |
+
+**Verifier expectations:**
+- Call `valid(tokenId)` to check revocation + expiration in a single view call.
+- Use `isRevoked(tokenId)` and `isExpired(tokenId)` individually when detailed status is needed.
+- Always re-verify before trusting a credential; state may change between issuance and verification.
+
 ### RevocationRegistry Optimizations
 
 The contract uses bitmap packing to store 256 revocation statuses per storage slot, reducing gas costs dramatically:
@@ -30,6 +61,9 @@ The contract uses bitmap packing to store 256 revocation statuses per storage sl
 - `revokedCount` cache eliminates repeated counting
 - `batchRevoke`, `batchUnrevoke`, `batchSetRevokedInRange` for batched writes
 - `batchIsRevoked` and `getRevokedBitmap` for batched reads
+- **Time-based revocation expiry** – `setRevokedWithExpiry` and `batchSetRevokedWithExpiry` allow revocations to auto-expire; `isRevoked()` returns false once the expiry timestamp has passed
+- `clearAll(contract)` – reset all revocation state for a token contract in a single call
+- Batch range operations emit `RevocationBatchSet` / `RevocationBatchCleared` events for off-chain indexing
   📜 Stellara AI Smart Contracts (Soroban)
 
 Soroban smart contracts powering Stellara AI, a Web3 crypto learning and social trading platform built on the Stellar blockchain. These contracts provide decentralized services for education credentials, social rewards, messaging, and on-chain trading used by the Stellara backend and frontend applications.
