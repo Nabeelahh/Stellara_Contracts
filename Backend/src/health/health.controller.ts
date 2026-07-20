@@ -4,46 +4,72 @@ import {
   Logger,
   ServiceUnavailableException,
 } from '@nestjs/common';
-import { DataSource } from 'typeorm';
-import { RedisService } from '../redis/redis.service';
-import { StellarEventMonitorService } from '../stellar-monitor/services/stellar-event-monitor.service';
+import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { DatabaseHealthIndicator } from './database-health.indicator';
+import { RedisHealthIndicator } from './redis-health.indicator';
+import { QueueHealthIndicator, QueueHealthCheckResult } from './queue-health.indicator';
+import { AuthHealthIndicator } from './auth-health.indicator';
+import { StellarEventMonitorService } from '../stellar-monitor/services/stellar-event-monitor.service';
 
+@ApiTags('Health')
 @Controller('health')
 export class HealthController {
   private readonly logger = new Logger(HealthController.name);
 
   constructor(
     private readonly databaseHealthIndicator: DatabaseHealthIndicator,
-    private readonly redisService: RedisService,
+    private readonly redisHealthIndicator: RedisHealthIndicator,
+    private readonly queueHealthIndicator: QueueHealthIndicator,
+    private readonly authHealthIndicator: AuthHealthIndicator,
     private readonly stellarMonitorService: StellarEventMonitorService,
   ) {}
 
   @Get('live')
+  @ApiOperation({ summary: 'Liveness probe — confirms the process is running' })
+  @ApiResponse({ status: 200, description: 'Service is alive' })
   getLiveness() {
     return { status: 'ok', timestamp: new Date().toISOString() };
   }
 
   @Get('ready')
+  @ApiOperation({ summary: 'Readiness probe — checks all downstream dependencies' })
+  @ApiResponse({ status: 200, description: 'All dependencies healthy' })
+  @ApiResponse({ status: 503, description: 'One or more dependencies unhealthy' })
   async getReadiness() {
-    const checks: Record<string, { status: string; message?: string; [key: string]: any }> = {};
+    const start = Date.now();
+    const checks: Record<string, any> = {};
     let allHealthy = true;
 
+    // Database
     const databaseCheck = await this.databaseHealthIndicator.isHealthy();
     checks.database = databaseCheck;
     if (databaseCheck.status === 'error') {
       allHealthy = false;
     }
 
-    try {
-      await this.redisService.client.ping();
-      checks.redis = { status: 'ok' };
-    } catch (err: any) {
-      this.logger.warn(`Redis health check failed: ${err.message}`);
-      checks.redis = { status: 'error', message: err.message };
+    // Redis
+    const redisCheck = await this.redisHealthIndicator.isHealthy();
+    checks.redis = redisCheck;
+    if (redisCheck.status === 'error') {
       allHealthy = false;
     }
 
+    // Queue
+    const queueCheck: QueueHealthCheckResult =
+      await this.queueHealthIndicator.isHealthy();
+    checks.queue = queueCheck;
+    if (queueCheck.status === 'error') {
+      allHealthy = false;
+    }
+
+    // Auth
+    const authCheck = await this.authHealthIndicator.isHealthy();
+    checks.auth = authCheck;
+    if (authCheck.status === 'error') {
+      allHealthy = false;
+    }
+
+    // Stellar Monitor (existing)
     try {
       const monitorStatus = this.stellarMonitorService.getStatus();
       checks.stellarMonitor = {
@@ -60,6 +86,7 @@ export class HealthController {
     const response = {
       status: allHealthy ? 'ok' : 'error',
       timestamp: new Date().toISOString(),
+      responseTimeMs: Date.now() - start,
       checks,
     };
 
