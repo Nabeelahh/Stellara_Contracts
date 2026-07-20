@@ -52,6 +52,7 @@ CONTRACTS=(
     "trading:target/wasm32-unknown-unknown/release/trading.wasm"
     "messaging:target/wasm32-unknown-unknown/release/messaging.wasm"
     "academy:target/wasm32-unknown-unknown/release/academy_vesting.wasm"
+    "cross-chain-router:target/wasm32-unknown-unknown/release/cross_chain_router.wasm"
 )
 
 declare -A CONTRACT_IDS

@@ -38,6 +38,39 @@ This ensures governance behavior is consistent across contracts using shared mod
 
 Use a minimal mock token contract exposing `balance` and `transfer` so the shared `FeeManager` can execute real fee collection logic during trading integration tests.
 
+### 5. Replay Protection Testing
+
+When testing replay protection across contracts:
+
+- Send the same message twice with identical parameters and verify the second is rejected.
+- Use `try_*` methods to assert recoverable errors for replay attempts.
+- Verify that different nonces with the same payload are accepted independently.
+
+### 6. Cross-Chain Message Hash Verification
+
+For contracts that compute message hashes:
+
+- Verify hash determinism: the same inputs always produce the same hash.
+- Verify hash uniqueness: different nonces produce different hashes.
+- Use the public hash computation method to validate off-chain hash matching.
+
+### 7. Fee Accounting Determinism
+
+When testing fee collection across contracts:
+
+- Set fees via admin functions before processing messages.
+- Assert that fee accounting state is updated correctly after each message.
+- Verify that zero-fee configurations still allow message processing.
+- Ensure fee accounting is independent of other contract state.
+
+### 8. Malformed Payload Handling
+
+Test edge cases for message payloads:
+
+- Empty payloads: verify acceptance or rejection per contract design.
+- Oversized payloads: verify bounds enforcement.
+- Boundary values: test at exact limits.
+
 ## Running Integration Tests
 
 From the Contracts workspace root:

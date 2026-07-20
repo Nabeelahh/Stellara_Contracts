@@ -8,8 +8,8 @@ use shared::governance::{GovernanceManager, UpgradeProposal};
 use shared::nonce::NonceManager;
 use shared::reentrancy_guard::ReentrancyGuard;
 use soroban_sdk::{
-    contract, contractimpl, contracttype, symbol_short, Address, Bytes, Env, Map, String, Symbol,
-    Vec,
+    contract, contractimpl, contracttype, symbol_short, Address, Bytes, BytesN, Env, Map, String,
+    Symbol, Vec, xdr::ToXdr,
 };
 
 const CONTRACT_VERSION: u32 = 1;
@@ -31,6 +31,14 @@ pub struct Message {
     pub timestamp: u64,
     pub read: bool,
     pub processed: bool,
+    pub nonce: u64,
+}
+
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct MessageHashRecord {
+    pub message_id: u64,
+    pub hash: BytesN<32>,
 }
 
 #[contracttype]
@@ -81,6 +89,7 @@ pub struct EncryptedMessage {
     pub timestamp: u64,
     pub read: bool,
     pub processed: bool,
+    pub nonce: u64,
 }
 
 #[contracttype]
@@ -231,6 +240,15 @@ fn set_global_window_usage(env: &Env, window: u64, count: u32) {
     env.storage().persistent().set(&key, &count);
 }
 
+fn compute_message_hash(env: &Env, sender: &Address, recipient: &Address, payload: &String, nonce: u64) -> BytesN<32> {
+    let mut data = Bytes::new(env);
+    data.append(&sender.clone().to_xdr(env));
+    data.append(&recipient.clone().to_xdr(env));
+    data.append(&payload.clone().to_xdr(env));
+    data.append(&nonce.to_xdr(env));
+    env.crypto().sha256(&data).into()
+}
+
 fn check_and_consume_message_rate_limit(env: &Env, sender: &Address) -> Result<(), MessagingError> {
     let cfg = read_rate_limit_config(env);
 
@@ -360,16 +378,33 @@ impl UpgradeableMessagingContract {
         let message_id = stats.last_message_id + 1;
 
         let current_timestamp = env.ledger().timestamp();
+        let nonce = env.ledger().sequence() as u64;
 
         let message = Message {
             id: message_id,
             sender: sender.clone(),
             recipient: recipient.clone(),
-            payload,
+            payload: payload.clone(),
             timestamp: current_timestamp,
             read: false,
             processed: true,
+            nonce,
         };
+
+        let message_hash = compute_message_hash(&env, &sender, &recipient, &payload, nonce);
+        let hash_record = MessageHashRecord {
+            message_id,
+            hash: message_hash,
+        };
+        let mut hash_store: Map<BytesN<32>, MessageHashRecord> = env
+            .storage()
+            .persistent()
+            .get(&symbol_short!("msg_hash"))
+            .unwrap_or_else(|| Map::new(&env));
+        hash_store.set(hash_record.hash.clone(), hash_record);
+        env.storage()
+            .persistent()
+            .set(&symbol_short!("msg_hash"), &hash_store);
 
         let mut messages = get_messages_map(&env);
         messages.set(message_id, message);
@@ -572,6 +607,16 @@ impl UpgradeableMessagingContract {
             .persistent()
             .get(&symbol_short!("ver"))
             .unwrap_or(0)
+    }
+
+    pub fn compute_message_hash_public(
+        env: Env,
+        sender: Address,
+        recipient: Address,
+        payload: String,
+        nonce: u64,
+    ) -> BytesN<32> {
+        compute_message_hash(&env, &sender, &recipient, &payload, nonce)
     }
 
     pub fn set_rate_limit_config(
@@ -854,6 +899,7 @@ impl UpgradeableMessagingContract {
         let message_id = stats.last_message_id + 1;
 
         let current_timestamp = env.ledger().timestamp();
+        let nonce = env.ledger().sequence() as u64;
 
         let message = EncryptedMessage {
             id: message_id,
@@ -863,6 +909,7 @@ impl UpgradeableMessagingContract {
             timestamp: current_timestamp,
             read: false,
             processed: true,
+            nonce,
         };
 
         let mut messages = get_encrypted_messages_map(&env);
