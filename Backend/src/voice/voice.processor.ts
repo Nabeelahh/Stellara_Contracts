@@ -25,9 +25,10 @@ export class VoiceProcessor {
     const wrappedProcess = this.queueJobTracingWrapper.wrapProcessor(
       async (jobToProcess: Job) => {
         const { jobId } = jobToProcess.data;
+        const correlationId = jobToProcess.data?.correlationId || `voice-${jobId}`;
         const start = Date.now();
 
-        this.metricsService.recordJobStart('voice-processing');
+        this.metricsService.recordJobStart('voice-processing', correlationId);
 
         try {
           const voiceJob = await this.voiceJobRepository.findOne({
@@ -45,10 +46,10 @@ export class VoiceProcessor {
           });
 
           const duration = (Date.now() - start) / 1000;
-          this.metricsService.recordJobCompleted('voice-processing', duration);
+          this.metricsService.recordJobCompleted('voice-processing', duration, correlationId);
         } catch (error: any) {
           const duration = (Date.now() - start) / 1000;
-          this.metricsService.recordJobFailed('voice-processing', duration, error.constructor.name);
+          this.metricsService.recordJobFailed('voice-processing', duration, error.constructor.name, correlationId);
           const canRetry = await this.voiceService.incrementRetry(jobId);
 
           if (canRetry) {
@@ -72,9 +73,10 @@ export class VoiceProcessor {
     const wrappedProcess = this.queueJobTracingWrapper.wrapProcessor(
       async (jobToProcess: Job) => {
         const { jobId } = jobToProcess.data;
+        const correlationId = jobToProcess.data?.correlationId || `voice-${jobId}`;
         const start = Date.now();
 
-        this.metricsService.recordJobStart('voice-processing');
+        this.metricsService.recordJobStart('voice-processing', correlationId);
 
         try {
           const voiceJob = await this.voiceJobRepository.findOne({
@@ -92,10 +94,10 @@ export class VoiceProcessor {
           });
 
           const duration = (Date.now() - start) / 1000;
-          this.metricsService.recordJobCompleted('voice-processing', duration);
+          this.metricsService.recordJobCompleted('voice-processing', duration, correlationId);
         } catch (error: any) {
           const duration = (Date.now() - start) / 1000;
-          this.metricsService.recordJobFailed('voice-processing', duration, error.constructor.name);
+          this.metricsService.recordJobFailed('voice-processing', duration, error.constructor.name, correlationId);
           const canRetry = await this.voiceService.incrementRetry(jobId);
 
           if (canRetry) {
