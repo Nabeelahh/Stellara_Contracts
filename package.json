@@ -1,0 +1,7 @@
+{
+  "dependencies": {
+    "@nestjs/cache-manager": "^3.1.0",
+    "cache-manager-ioredis-yet": "^2.1.2",
+    "ioredis": "^5.10.1"
+  }
+}

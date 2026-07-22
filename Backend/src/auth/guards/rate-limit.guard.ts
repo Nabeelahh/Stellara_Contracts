@@ -1,4 +1,8 @@
-import { Injectable, CanActivate, ExecutionContext } from '@nestjs/common';
+import {
+  Injectable,
+  CanActivate,
+  ExecutionContext,
+} from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { RateLimitService } from '../services/rate-limit.service';
 import { RateLimitError } from '../../common/exceptions/api-error.exception';
@@ -26,12 +30,6 @@ export const RateLimit = (options: RateLimitOptions) => {
   };
 };
 
-/**
- * Guard that enforces per-IP rate limits on decorated endpoints.
- *
- * Throws `RateLimitError` (typed `ApiError`) so the `HttpExceptionFilter`
- * renders the standard error envelope with errorCode `RATE_LIMIT_EXCEEDED`.
- */
 @Injectable()
 export class RateLimitGuard implements CanActivate {
   constructor(
@@ -52,23 +50,23 @@ export class RateLimitGuard implements CanActivate {
     const request = context.switchToHttp().getRequest();
     const response = context.switchToHttp().getResponse();
 
-    // Get client IP
-    const ip = request.ip || request.connection.remoteAddress;
+    // Securely extract the client identifier string
+    const ip = request.ip || request.connection?.remoteAddress || 'unknown';
 
-    // Generate rate limit key
-    const keyPrefix = options.keyPrefix || context.getHandler().name;
-    const key = this.rateLimitService.generateKeyForIp(ip, keyPrefix);
+    // Establish the target route or function namespace identifier
+    const keyPrefix = options.keyPrefix || request.route?.path || context.getHandler().name;
 
-    // Check rate limit
+    // Execute atomic validation check matching the service signature: (ip, route, limit, windowSeconds)
     const result = await this.rateLimitService.checkRateLimit(
-      key,
+      ip,
+      keyPrefix,
       options.limit,
       options.windowSeconds,
     );
 
-    // Set informational rate limit headers
-    response.setHeader('X-RateLimit-Limit', options.limit);
-    response.setHeader('X-RateLimit-Remaining', result.remaining);
+    // Explicitly set string values on tracking header fields to satisfy HTTP specs
+    response.setHeader('X-RateLimit-Limit', options.limit.toString());
+    response.setHeader('X-RateLimit-Remaining', result.remaining.toString());
     response.setHeader('X-RateLimit-Reset', result.resetAt.toISOString());
 
     if (!result.allowed) {

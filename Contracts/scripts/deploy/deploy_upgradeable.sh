@@ -68,6 +68,7 @@ CONTRACTS=(
     "did-registry:target/wasm32-unknown-unknown/release/did_registry.wasm"
     "identity-hub:target/wasm32-unknown-unknown/release/identity_hub.wasm"
     "verifiable-credentials:target/wasm32-unknown-unknown/release/verifiable_credentials.wasm"
+    "cross-chain-router:target/wasm32-unknown-unknown/release/cross_chain_router.wasm"
 )
 
 declare -A CONTRACT_IDS

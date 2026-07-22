@@ -224,7 +224,62 @@ stellar contract invoke \
 # Expected: status = Executed, executed = true
 ```
 
-## Part 5: Handling Errors & Rejections
+## Part 5: Parameter Updates (Governance-Controlled)
+
+### Overview
+
+Parameter changes now require a governance-approved flow with a 24-hour timelock. This ensures all critical configuration changes are auditable and safer to update.
+
+### Step 11: Propose Parameter Change
+
+```bash
+# Example: Update rebalancing threshold
+PARAMETER_KEY="rebal_threshold"  # Parameter to update
+NEW_VALUE=750                     # New value in basis points (7.5%)
+
+# Propose the parameter change (from ADMIN account)
+PARAM_PROPOSAL_ID=$(stellar contract invoke \
+  --id $TRADING_ID \
+  --source $ADMIN \
+  --network testnet \
+  -- propose_parameter_change \
+  --admin "$ADMIN" \
+  --parameter_key "$PARAMETER_KEY" \
+  --new_value "$NEW_VALUE" | grep -oP '\d+')
+
+echo "Parameter Proposal ID: $PARAM_PROPOSAL_ID"
+```
+
+### Step 12: Execute Parameter Change (After Timelock)
+
+```bash
+# After 24-hour timelock, EXECUTOR can execute the parameter change
+stellar contract invoke \
+  --id $TRADING_ID \
+  --source $EXECUTOR \
+  --network testnet \
+  -- execute_parameter_change \
+  --proposal_id "$PARAM_PROPOSAL_ID"
+
+echo "Parameter change executed successfully!"
+```
+
+### Step 13: Cancel Parameter Proposal (If Needed)
+
+```bash
+# ADMIN can cancel a parameter proposal before execution
+stellar contract invoke \
+  --id $TRADING_ID \
+  --source $ADMIN \
+  --network testnet \
+  -- cancel_parameter_proposal \
+  --admin "$ADMIN" \
+  --proposal_id "$PARAM_PROPOSAL_ID"
+
+echo "Parameter proposal cancelled"
+```
+
+## Part 6: Handling Errors & Rejections
 
 ### Scenario A: Rejecting an Upgrade
 
@@ -288,7 +343,7 @@ stellar contract invoke \
 # Each signer can only approve once per proposal
 ```
 
-## Part 6: Contract Pause/Unpause
+## Part 7: Contract Pause/Unpause
 
 ### Emergency Pause
 
@@ -441,6 +496,15 @@ Solution:
   • Example: 2-of-3 requires at least 3 approvers
 ```
 
+### Issue: "ProposalNotActive" Error
+
+```
+Cause: Trying to execute or cancel a proposal that is already executed or cancelled
+Solution:
+  • Check proposal status before executing or cancelling
+  • Only active (Pending) proposals can be executed or cancelled
+```
+
 ## Best Practices
 
 ### For Admins
@@ -519,6 +583,9 @@ stellar contract invoke \
 - [ ] Test cancellation by admin
 - [ ] Verify duplicate approval prevention
 - [ ] Test pause/unpause functions
+- [ ] Test parameter change proposal
+- [ ] Test parameter change execution after timelock
+- [ ] Test parameter change cancellation
 
 ### Pre-Mainnet Requirements
 
@@ -534,5 +601,5 @@ stellar contract invoke \
 ---
 
 **Last Updated**: January 22, 2026  
-**Version**: 1.0  
+**Version**: 1.1  
 **Status**: Active

@@ -2,7 +2,8 @@
 
 use shared::circuit_breaker::{CircuitBreaker, CircuitBreakerConfig, PauseLevel};
 use soroban_sdk::{
-    contract, contracterror, contractimpl, contracttype, symbol_short, Address, Env, String, Symbol,
+    contract, contracterror, contractimpl, contracttype, symbol_short, Address, Env, Map, String,
+    Symbol,
 };
 
 // Contract Errors
@@ -23,7 +24,26 @@ pub enum ContractError {
     BadgeExpired = 11,
     RedemptionLimitReached = 12,
     TransactionAlreadyRedeemed = 13,
+    ProposalNotFound = 14,
+    ProposalNotActive = 15,
+    TimelockNotExpired = 16,
 }
+
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ParameterProposal {
+    pub id: u64,
+    pub proposer: Address,
+    pub parameter_key: Symbol,
+    pub old_value: u128,
+    pub new_value: u128,
+    pub proposed_at: u64,
+    pub executes_at: u64,
+    pub executed: bool,
+    pub cancelled: bool,
+}
+
+const TIMELOCK_DELAY: u64 = 86400; // 24 hours in seconds
 
 // Storage keys
 #[contracttype]
@@ -269,6 +289,167 @@ impl AcademyRewardsContract {
         Ok(())
     }
 
+    // ========== GOVERNANCE PARAMETER FUNCTIONS ==========
+
+    /// Propose a parameter change (governance-controlled)
+    pub fn propose_parameter_change(
+        env: Env,
+        admin: Address,
+        parameter_key: Symbol,
+        new_value: u128,
+    ) -> Result<u64, ContractError> {
+        Self::require_admin(&env, &admin)?;
+
+        let params_map_key = symbol_short!("gov_vals");
+        let params_map: Map<Symbol, u128> = env
+            .storage()
+            .persistent()
+            .get(&params_map_key)
+            .unwrap_or_else(|| Map::new(&env));
+
+        let old_value = params_map.get(parameter_key.clone()).unwrap_or(0);
+
+        let proposal_id = env
+            .storage()
+            .persistent()
+            .get::<Symbol, u64>(&symbol_short!("pcnt"))
+            .unwrap_or(0)
+            + 1;
+
+        let proposal = ParameterProposal {
+            id: proposal_id,
+            proposer: admin,
+            parameter_key: parameter_key.clone(),
+            old_value,
+            new_value,
+            proposed_at: env.ledger().timestamp(),
+            executes_at: env.ledger().timestamp() + TIMELOCK_DELAY,
+            executed: false,
+            cancelled: false,
+        };
+
+        let proposals_key = symbol_short!("pprop");
+        let mut proposals: Map<u64, ParameterProposal> = env
+            .storage()
+            .persistent()
+            .get(&proposals_key)
+            .unwrap_or_else(|| Map::new(&env));
+
+        proposals.set(proposal_id, proposal);
+        env.storage().persistent().set(&proposals_key, &proposals);
+        env.storage()
+            .persistent()
+            .set(&symbol_short!("pcnt"), &proposal_id);
+
+        env.events().publish(
+            (symbol_short!("pprop"), proposal_id),
+            (parameter_key, new_value, env.ledger().timestamp()),
+        );
+
+        Ok(proposal_id)
+    }
+
+    /// Execute a parameter change after timelock (governance-controlled)
+    pub fn execute_parameter_change(
+        env: Env,
+        admin: Address,
+        proposal_id: u64,
+    ) -> Result<(), ContractError> {
+        Self::require_admin(&env, &admin)?;
+
+        let proposals_key = symbol_short!("pprop");
+        let mut proposals: Map<u64, ParameterProposal> = env
+            .storage()
+            .persistent()
+            .get(&proposals_key)
+            .ok_or(ContractError::ProposalNotFound)?;
+
+        let mut proposal = proposals
+            .get(proposal_id)
+            .ok_or(ContractError::ProposalNotFound)?;
+
+        if proposal.executed || proposal.cancelled {
+            return Err(ContractError::ProposalNotActive);
+        }
+
+        if env.ledger().timestamp() < proposal.executes_at {
+            return Err(ContractError::TimelockNotExpired);
+        }
+
+        let params_map_key = symbol_short!("gov_vals");
+        let mut params_map: Map<Symbol, u128> = env
+            .storage()
+            .persistent()
+            .get(&params_map_key)
+            .unwrap_or_else(|| Map::new(&env));
+
+        params_map.set(proposal.parameter_key.clone(), proposal.new_value);
+        env.storage().persistent().set(&params_map_key, &params_map);
+
+        proposal.executed = true;
+        proposals.set(proposal_id, proposal.clone());
+        env.storage().persistent().set(&proposals_key, &proposals);
+
+        env.events().publish(
+            (symbol_short!("pexec"), proposal_id),
+            (proposal.parameter_key, proposal.new_value, env.ledger().timestamp()),
+        );
+
+        Ok(())
+    }
+
+    /// Cancel a parameter proposal (governance-controlled)
+    pub fn cancel_parameter_proposal(
+        env: Env,
+        admin: Address,
+        proposal_id: u64,
+    ) -> Result<(), ContractError> {
+        Self::require_admin(&env, &admin)?;
+
+        let proposals_key = symbol_short!("pprop");
+        let mut proposals: Map<u64, ParameterProposal> = env
+            .storage()
+            .persistent()
+            .get(&proposals_key)
+            .ok_or(ContractError::ProposalNotFound)?;
+
+        let mut proposal = proposals
+            .get(proposal_id)
+            .ok_or(ContractError::ProposalNotFound)?;
+
+        if proposal.executed {
+            return Err(ContractError::ProposalNotActive);
+        }
+
+        proposal.cancelled = true;
+        proposals.set(proposal_id, proposal);
+        env.storage().persistent().set(&proposals_key, &proposals);
+
+        env.events().publish(
+            (symbol_short!("pcancel"), proposal_id),
+            (env.ledger().timestamp(),),
+        );
+
+        Ok(())
+    }
+
+    /// Get parameter proposal details
+    pub fn get_parameter_proposal(
+        env: Env,
+        proposal_id: u64,
+    ) -> Result<ParameterProposal, ContractError> {
+        let proposals_key = symbol_short!("pprop");
+        let proposals: Map<u64, ParameterProposal> = env
+            .storage()
+            .persistent()
+            .get(&proposals_key)
+            .ok_or(ContractError::ProposalNotFound)?;
+
+        proposals
+            .get(proposal_id)
+            .ok_or(ContractError::ProposalNotFound)
+    }
+
     // ========== USER FUNCTIONS ==========
 
     /// Redeem badge for fee discount
@@ -417,4 +598,5 @@ impl AcademyRewardsContract {
     // Removed require_not_paused helper in favor of CircuitBreaker
 }
 
-// mod test; // Removed failing tests
+#[cfg(test)]
+mod test;

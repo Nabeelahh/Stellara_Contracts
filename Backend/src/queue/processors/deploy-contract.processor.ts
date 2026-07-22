@@ -32,12 +32,13 @@ export class DeployContractProcessor {
       async (jobToProcess: Job<DeployContractData>) => {
         const { contractName, contractCode, network, initializer } = jobToProcess.data;
         const start = Date.now();
+        const correlationId = (jobToProcess.data as any)?.correlationId || 'deploy-contract-' + (jobToProcess as any).id;
 
         this.logger.log(
           `Processing deploy-contract job ${jobToProcess.id}: ${contractName} on ${network}`,
         );
 
-        this.metrics?.recordJobStart('deploy-contract');
+        this.metrics?.recordJobStart('deploy-contract', correlationId);
 
         try {
           await jobToProcess.progress(10);
@@ -75,7 +76,7 @@ export class DeployContractProcessor {
           await jobToProcess.progress(100);
 
           const duration = (Date.now() - start) / 1000;
-          this.metrics?.recordJobCompleted('deploy-contract', duration);
+          this.metrics?.recordJobCompleted('deploy-contract', duration, correlationId);
 
           return {
             success: true,
@@ -89,7 +90,7 @@ export class DeployContractProcessor {
           };
         } catch (error) {
           const duration = (Date.now() - start) / 1000;
-          this.metrics?.recordJobFailed('deploy-contract', duration, error.constructor.name);
+          this.metrics?.recordJobFailed('deploy-contract', duration, error.constructor.name, correlationId);
           this.logger.error(
             `Failed to deploy contract: ${error.message}`,
             error.stack,

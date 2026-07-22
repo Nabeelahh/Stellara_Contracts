@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Module, MiddlewareConsumer, NestModule } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { ScheduleModule } from '@nestjs/schedule';
@@ -37,6 +37,7 @@ import { ThrottleModule } from './throttle/throttle.module';
 import { HealthModule } from './health/health.module';
 import { ObservabilityModule } from './observability/observability.module';
 import { TracingInterceptor } from './observability/interceptors/tracing.interceptor';
+import { CorrelationMiddleware } from './observability/middleware/correlation.middleware';
 
 @Module({
   imports: [
@@ -122,4 +123,8 @@ VoiceJob,
     },
   ],
 })
-export class AppModule {}
+export class AppModule implements NestModule {
+  configure(consumer: MiddlewareConsumer) {
+    consumer.apply(CorrelationMiddleware).forRoutes('*');
+  }
+}
